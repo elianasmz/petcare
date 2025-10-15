@@ -1,5 +1,12 @@
 <script setup>
-import { ref, reactive } from "vue";
+import { onMounted, ref, reactive, computed } from "vue";
+import { useServicesStore } from "../stores/servicesStore.js";
+
+const servicesStore = useServicesStore();
+
+onMounted(async () => {
+  await servicesStore.fetchServiceTypes();
+});
 
 // Datos del cuidador (simulación)
 const caretaker = reactive({
@@ -12,7 +19,7 @@ const caretaker = reactive({
 });
 
 // Servicios disponibles en el sistema
-const systemServices = ["Paseos", "Hospedaje", "Alimentación", "Visitas a domicilio"];
+const systemServices = computed(() => servicesStore.serviceTypes.map(st => st.name));
 
 // Servicios que ofrece este cuidador
 const caretakerServices = ref([
