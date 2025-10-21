@@ -1,10 +1,16 @@
 <script setup>
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router';
 import inicio from "../assets/inicio.jpg";
-import { useContadorStore } from '../stores/contador'; 
+import { useServicesStore } from '../stores/servicesStore'
 
-const contador = useContadorStore(); 
 const router = useRouter();
+const servicesStore = useServicesStore()
+
+// Cargar los tipos de servicio cuando se monta el componente
+onMounted(async () => {
+  await servicesStore.fetchServiceTypes()
+})
 
 function goToLogin() {
   router.push('/login'); // Redirige a la página de login
@@ -17,7 +23,7 @@ function goToLogin() {
     <section class="hero">
       <div class="hero-content">
         <div class="hero-image">
-           <img :src="inicio" alt="inicio" width="500" height="250" />
+          <img :src="inicio" alt="inicio" width="500" height="250" />
         </div>
         <div class="hero-text">
           <h1>Conecta con cuidadores de confianza para tu mascota</h1>
@@ -29,124 +35,116 @@ function goToLogin() {
         </div>
       </div>
     </section>
-     <!-- Contador de prueba -->
-   <!-- <section class="counter">
-      <h2>Contador de prueba</h2>
-      <p>Valor: {{ contador.count }}</p>
-      <button class="btn" @click="contador.increment()">+</button>
-      <button class="btn" @click="contador.decrement()">-</button>
-      <button class="btn" @click="contador.reset()">Reset</button>
-    </section>-->
 
     <!-- Listado de servicios -->
     <section class="services">
       <div class="services-container">
         <h2>Servicios que ofrecemos</h2>
-        <div class="service-list">
-          <div class="service-item">Paseos para mascotas</div>
-          <div class="service-item">Hospedaje</div>
-          <div class="service-item">Alimentación</div>
-          <div class="service-item">Transporte</div>
-          <div class="service-item">Baño basico</div>
-          <div class="service-item">Alojamiento temporal</div>
+        <div v-if="servicesStore.loading">Cargando servicios...</div>
+        <div v-else-if="servicesStore.error">Error: {{ servicesStore.error }}</div>
+
+        <div v-else class="service-list">
+          <!-- Render dinámico desde el backend -->
+          <div v-for="type in servicesStore.serviceTypes" :key="type.id" class="service-item">
+            {{ type.name }}
+          </div>
         </div>
       </div>
     </section>
   </div>
 </template>
 
-
 <style scoped>
+/* Hero section */
+.hero {
+  display: flex;
+  justify-content: center;
+  padding: 2rem;
+}
 
-  
-  /* Hero section */
-  .hero {
-    display: flex;
-    justify-content: center;
-    padding: 2rem;
-  }
+.hero-content,
+services {
+  display: flex;
+  gap: 2rem;
+  background: #eaf8fb;
+  padding: 2rem;
+  border-radius: 12px;
+  max-width: 2000px;
+  align-items: center;
+}
 
-  .hero-content, services {
-    display: flex;
-    gap: 2rem;
-    background: #eaf8fb;
-    padding: 2rem;
-    border-radius: 12px;
-    max-width: 2000px;
-    align-items: center;
-  }
+.hero-image img {
+  height: auto;
+  border-radius: 10px;
+  object-fit: cover;
+}
 
-  .hero-image img {
-    height: auto;
-    border-radius: 10px;
-    object-fit: cover;
-  }
+.hero-text h1 {
+  font-size: 1.8rem;
+  color: #2196f3;
+}
 
-  .hero-text h1 {
-    font-size: 1.8rem;
-    color: #2196f3;
-  }
+.hero-text p {
+  margin: 1rem 0;
+  color: #333;
+}
 
-  .hero-text p {
-    margin: 1rem 0;
-    color: #333;
-  }
+.btn {
+  background: transparent;
+  border: 1px solid #2196f3;
+  color: #2196f3;
+  padding: 0.6rem 1rem;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
 
-  .btn {
-    background: transparent;
-    border: 1px solid #2196f3;
-    color: #2196f3;
-    padding: 0.6rem 1rem;
-    border-radius: 20px;
-    cursor: pointer;
-    transition: all 0.2s ease-in-out;
-  }
+.btn:hover {
+  background: #2196f3;
+  color: white;
+}
 
-  .btn:hover {
-    background: #2196f3;
-    color: white;
-  }
-  .services {
-    background: #eaf8fb; 
-    padding: 2rem 1rem;
-  }
+.services {
+  background: #eaf8fb;
+  padding: 2rem 1rem;
+}
 
-  /* Contenedor centrado con mismo ancho que hero */
-  .services-container {
-    max-width: 900px;  
-    margin: 0 auto;
-    text-align: center;
-  }
+/* Contenedor centrado con mismo ancho que hero */
+.services-container {
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: center;
+}
 
-  .services h2 {
-    color: #2196f3;
-    margin-bottom: 2rem;
-    font-size: 1.6rem;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-  }
+.services h2 {
+  color: #2196f3;
+  margin-bottom: 2rem;
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
 
-  /* Contenedor horizontal de servicios */
-  .service-list {
-    display: flex;
-    flex-wrap: wrap;               
-    justify-content: center;
-    gap: 1rem;                     
-  }
+/* Contenedor horizontal de servicios */
+.service-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+}
 
-  .service-item {
-    flex: 1 1 calc(33.33% - 1rem); 
-    max-width: 250px;
-    background: #fff;              
-    padding: 1rem;
-    border-radius: 8px;
-    font-size: 1rem;
-    color: #333;
-    transition: transform 0.2s;
-    text-align: center;
-  }
+.service-item {
+  flex: 1 1 calc(33.33% - 1rem);
+  max-width: 250px;
+  background: #fff;
+  padding: 1rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  color: #333;
+  transition: transform 0.2s;
+  text-align: center;
+}
 
-  .service-item:hover {
-    transform: translateY(-3px); 
-  }
+.service-item:hover {
+  transform: translateY(-3px);
+}
 </style>
