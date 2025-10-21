@@ -291,21 +291,21 @@ function handleFileChange(event) {
               <td>{{ service.id }}</td>
               <td>{{ getServiceTypeName(service.serviceTypeId) }}</td>
               <td>{{ service.description || '-' }}</td>
-              <td class="text-success fw-bold">Gs. {{ service.price }}</td>
+              <td class="text-success fw-bold">Gs. {{ service.price.toLocaleString('es-PY') }}</td>
               <td>
                 <span v-if="service.active" class="badge bg-success">Activo</span>
                 <span v-else class="badge bg-secondary">Inactivo</span>
               </td>
               <td>
                 <button 
-                  class="btn btn-sm btn-warning me-2" 
+                  class="btn btn-sm btn-outline-primary me-2" 
                   @click="editService(service)" 
                   :disabled="servicesStore.loading"
                 >
                   <i class="bi bi-pencil"></i> Editar
                 </button>
                 <button 
-                  class="btn btn-sm btn-danger" 
+                  class="btn btn-sm btn-outline-secondary" 
                   @click="deleteService(service)" 
                   :disabled="servicesStore.loading"
                 >
