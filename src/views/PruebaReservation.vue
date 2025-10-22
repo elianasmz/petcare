@@ -1,24 +1,47 @@
 <script setup>
-import { onMounted } from "vue"
+import { onMounted, ref } from "vue"
 import { useReservationsStore } from "../stores/reservationsStore.js"
 import { useOwnerStore } from "../stores/ownerStore.js"
-import { useCarerStore } from "../stores/carerStore.js"
+import { useCarersStore } from "../stores/carersStore.js"
 
 const reservationsStore = useReservationsStore()
 const ownerStore = useOwnerStore()
-const carerStore = useCarerStore()
+const carerStore = useCarersStore()
+
+const searchId = ref("");
+
+async function buscar() {
+  if (!searchId.value) return;
+  await reservationsStore.getReservationById(searchId.value);
+}
 
 onMounted(() => {
-  reservationsStore.fetchReservations()
+  reservationsStore.getAllReservations()
 })
 </script>
 
 <template>
   <div>
     <h2>Reservaciones</h2>
-    <input v-model="reservationsStore.searchQuery" class="form-control" placeholder="Buscar..." />
+    <input
+        v-model="searchId"
+        class="form-control"
+        placeholder="Buscar..."
+    />
+
+    <button @click="buscar" class="btn btn-primary mt-2">Buscar</button>
+
+    <!-- Mostrar resultado -->
+    <div v-if="reservationsStore.selectedReservation" class="mt-3">
+      <h5>Resultado:</h5>
+      <p>ID: {{ reservationsStore.selectedReservation.id }}</p>
+      <p>Owner ID: {{ reservationsStore.selectedReservation.ownerId }}</p>
+      <p>Carer ID: {{ reservationsStore.selectedReservation.carerId }}</p>
+      <p>Estado: {{ reservationsStore.selectedReservation.reservationState }}</p>
+    </div>
 
     <div v-if="reservationsStore.loading">Cargando...</div>
+
     <div v-else-if="reservationsStore.error" class="text-danger">{{ reservationsStore.error }}</div>
 
     <table class="table table-striped mt-3">

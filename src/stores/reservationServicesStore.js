@@ -9,7 +9,7 @@ export const useReservationServicesStore = defineStore("reservationServices", {
     }),
 
     actions: {
-        async fetchByReservationId(reservationId) {
+        async getReservationServiceById(reservationId) {
             this.loading = true
             this.error = null
             try {
@@ -23,7 +23,7 @@ export const useReservationServicesStore = defineStore("reservationServices", {
             }
         },
 
-        async addReservationService(payload) {
+        async postReservationService(payload) {
             this.loading = true
             try {
                 const res = await ReservationServiceApi.create(payload)
@@ -37,7 +37,7 @@ export const useReservationServicesStore = defineStore("reservationServices", {
             }
         },
 
-        async removeReservationService(id) {
+        async deleteReservationService(id) {
             this.loading = true
             try {
                 await ReservationServiceApi.remove(id)
