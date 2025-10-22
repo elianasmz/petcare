@@ -5,36 +5,149 @@ class ReservationApi {
         this.reservationApi = getAxiosInstance('reservation')
     }
 
-    // Crear una nueva reservación
-    createReservation(data) {
+    /**
+     * RESERVATION
+     */
+    /**
+     * Obtener todas las reservaciones (paginadas)
+     * @param params {page, size, sortBy, sortDir}
+     * @returns {Promise<axios.AxiosResponse<any>>}
+     */
+    getAllReservations(params = {page: 0, size: 10, sortBy: 'id', sortDir: 'DESC'}) {
+        return this.reservationApi.get('/reservations', { params })
+    }
+
+    /**
+     * Crear una nueva reservación
+     * @param data {ownerId, carerId, serviceDate, reservationState}
+     * @returns {Promise<axios.AxiosResponse<any>>}
+     */
+    postReservation(data) {
         return this.reservationApi.post('/reservations', data)
     }
 
-    // Actualizar reservación
-    updateReservation(id, data) {
-        return this.reservationApi.put(`/reservations/${id}`, data)
-    }
-
-    // Obtener reservación por ID
+    /**
+     * Obtener una reservación por ID
+     * @param id
+     * @returns {Promise<axios.AxiosResponse<any>>}
+     */
     getReservationById(id) {
         return this.reservationApi.get(`/reservations/${id}`)
     }
 
-    // Listar todas las reservaciones (con paginación y orden)
-    getAllReservations(params = {}) {
-        // params puede tener: page, size, sortBy, sortDir
-        return this.reservationApi.get('/reservations', { params })
+    /**
+     *
+     * @param id
+     * @param data {ownerId, carerId, serviceDate, reservationState}
+     * @returns {Promise<axios.AxiosResponse<any>>}
+     */
+    putReservation(id, data) {
+        return this.reservationApi.put(`/reservations/${id}`, data)
     }
 
-    // Buscar reservaciones con filtros opcionales
+    /**
+     * Eliminar una reservación por ID
+     * @param id
+     * @returns {Promise<axios.AxiosResponse<any>>}
+     */
+    deleteReservation(id) {
+        return this.reservationApi.delete(`/reservations/${id}`)
+    }
+
+    /**
+     * Buscar reservaciones por filtros
+     * @param filters {ownerId, carerId, dateFrom, dateTo, reservationState, page, size, sortBy, sortDir}
+     * @returns {Promise<axios.AxiosResponse<any>>}
+     */
     searchReservations(filters = {}) {
-        // filters puede incluir: ownerId, carerId, state, startDate, endDate, page, size, sortBy, sortDir
         return this.reservationApi.get('/reservations/search', { params: filters })
     }
 
-    // Eliminar reservación (borrado lógico)
-    deleteReservation(id) {
-        return api.reservationServiceApi.delete(`/reservations/${id}`)
+    /**
+     * RESERVATION SERVICE
+     */
+    /**
+     * Obtener todas las relaciones Reservation-Service (paginadas)
+     * @param params {page, size, sortBy, sortDir}
+     * @returns {Promise<axios.AxiosResponse<any>>}
+     */
+    getAllRelations(params = {}) {
+        // params: page, size, sortBy, sortDir
+        return this.reservationApi.get('/reservation-services', { params })
+    }
+
+    /**
+     * Crear una nueva relación Reservation-Service
+     * @param data {reservationId, serviceId}
+     * @returns {Promise<axios.AxiosResponse<any>>}
+     */
+    postRelation(data) {
+        return this.reservationApi.post('/reservation-services', data)
+    }
+
+    /**
+     * Obtener una relación Reservation-Service por ID
+     * @param id
+     * @returns {Promise<axios.AxiosResponse<any>>}
+     */
+    getRelationById(id) {
+        return this.reservationApi.get(`/reservation-services/${id}`)
+    }
+
+    /**
+     * Actualizar una relación Reservation-Service por ID
+     * @param id
+     * @param data {reservationId, serviceId}
+     * @returns {Promise<axios.AxiosResponse<any>>}
+     */
+    putRelation(id, data) {
+        return this.reservationApi.put(`/reservation-services/${id}`, data)
+    }
+
+    /**
+     * Eliminar una relación Reservation-Service por ID
+     * @param id
+     * @returns {Promise<axios.AxiosResponse<any>>}
+     */
+    deleteRelation(id) {
+        return this.reservationApi.delete(`/reservation-services/${id}`)
+    }
+
+    /**
+     * Obtener relaciones por ID de reservación
+     * @param reservationId
+     * @returns {Promise<axios.AxiosResponse<any>>}
+     */
+    getServicesByReservation(reservationId) {
+        return this.reservationApi.get(`/reservation-services/by-reservation/${reservationId}`)
+    }
+
+    /**
+     * Eliminar relaciones por ID de reservación
+     * @param reservationId
+     * @returns {Promise<axios.AxiosResponse<any>>}
+     */
+    deleteByResevationId(reservationId) {
+        return this.reservationApi.delete(`/reservation-services/by-reservation/${reservationId}`)
+    }
+
+    /**
+     * Obtener relaciones por ID de servicio
+     * @param serviceId
+     * @returns {Promise<axios.AxiosResponse<any>>}
+     */
+    getReservationsByService(serviceId) {
+        return this.reservationApi.get(`/reservation-services/by-service/${serviceId}`)
+    }
+
+    /**
+     * Buscar relaciones por filtros
+     * @param filters {reservationId, serviceId, page, size, sortBy, sortDir}
+     * @returns {Promise<axios.AxiosResponse<any>>}
+     */
+    searchRelations(filters = {}) {
+        // filters: reservationId, serviceId, page, size, sortBy, sortDir
+        return this.reservationApi.get('/reservation-services/search', { params: filters })
     }
 }
 
