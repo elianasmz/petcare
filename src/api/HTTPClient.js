@@ -10,7 +10,7 @@ class HTTPClient {
     }
 
     // ======================
-    // 📅 RESERVACIONES
+    // RESERVACIONES
     // ======================
     getReservations() {
         return this.reservationApi.get('/reservations')
@@ -25,7 +25,7 @@ class HTTPClient {
     }
 
     // ======================
-    // 💼 SERVICIOS
+    // SERVICIOS
     // ======================
     getServices() {
         return this.serviceApi.get('/services')
@@ -40,7 +40,7 @@ class HTTPClient {
     }
 
     // ======================
-    // 💳 PAGOS
+    // PAGOS
     // ======================
     getPayments() {
         return this.paymentApi.get('/payments')
