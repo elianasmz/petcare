@@ -3,7 +3,7 @@ import { onMounted, ref, reactive, computed } from "vue"
 import { useServicesStore } from "../stores/servicesStore.js"
 
 const servicesStore = useServicesStore()
-const carerId = ref(1) // Simula cuidador logueado
+const carerId = ref(9) // Simula cuidador logueado
 
 // Referencia al formulario de servicio
 const serviceFormRef = ref(null)
@@ -11,11 +11,11 @@ const serviceFormRef = ref(null)
 // Datos del cuidador
 const caretaker = reactive({
   id: carerId.value,
-  name: "María López",
-  email: "maria@example.com",
-  phone: "099123456",
+  name: "Marta Pérez",
+  email: "marta.perez@gmail.com",
+  phone: "0981777777",
   bio: "Amante de los animales con 5 años de experiencia.",
-  photo: "https://randomuser.me/api/portraits/women/44.jpg",
+  photo: "https://randomuser.me/api/portraits/women/90.jpg",
 })
 
 // Formulario de servicio (crear/editar)
