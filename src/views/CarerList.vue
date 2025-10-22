@@ -146,7 +146,7 @@ function viewDetail(caretaker) {
           <h5 class="mb-3">Filtrar cuidadores</h5>
           <div class="row g-3">
             <div class="col-md-4">
-              <label class="form-label fw-bold">Por servicio</label>
+              <label class="form-label fw-bold">Por tipo de servicio</label>
               <select v-model="selectedServiceType" class="form-select">
                 <option v-for="type in allServiceTypes" :key="type" :value="type">
                   {{ type }}
