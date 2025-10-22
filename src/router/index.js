@@ -10,18 +10,22 @@ import CarerList from '../views/CarerList.vue'
 import CarerDetail from '../views/CarerDetail.vue';
 import CarerReservations from '../views/CarerReservations.vue';
 import PayReservations from '../views/PayReservations.vue';
+import PruebaReservation from '../views/PruebaReservation.vue';
 
 const routes = [
+
   { path: '/', name: 'Home', component: Home },
+    { path: '/:pathMatch(.*)*', name: 'NotFound', component: NotFound },
   { path: '/login', name: 'Login', component: Login },
   { path: '/caretakers', name:'CarerList',  component: CarerList },
   { path: '/carer', name: 'CarerDashboard', component: CarerDashboard },
-  { path: '/reservations', name: 'Reservations', component: Reservations },
-  { path: '/reservations/:id', name: 'ReservationDetails', component: ReservationDetails, props: true },
-  { path: '/:pathMatch(.*)*', name: 'NotFound', component: NotFound },
+
+    // Reservations routes
+    { path: '/reservations', name: 'Reservations', component: Reservations },
   { path: "/caretakers/:id", name: "CarerDetail", component: CarerDetail, props: true },
   { path: "/carer-reservations", name:"CarerReservations", component: CarerReservations},
-  { path: '/reservation/:id/pay', name: 'PayReservations', component: PayReservations, props: true }
+  { path: '/reservation/:id/pay', name: 'PayReservations', component: PayReservations, props: true },
+    { path: "/prueba-reservations", name:"PruebaReservation", component: PruebaReservation}
 ];
 
 const router = createRouter({
