@@ -123,7 +123,7 @@ function goToPayment(reservaId) {
             <!-- 🖼️ Foto y datos -->
             <div class="d-flex align-items-center flex-grow-1">
               <img
-                  :src="reserva.carer.photo"
+                  :src="reserva.carer.profilePhoto"
                   class="rounded-circle me-3"
                   width="60"
                   height="60"

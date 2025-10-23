@@ -92,6 +92,7 @@ export const useReservationsStore = defineStore("reservations", {
             try {
                 // Instancias de los stores
                 const carerStore = useCarersStore()
+                carerStore.fetchCarers();
                 const ownerStore = useOwnerStore()
 
                 // Obtener la reserva base
@@ -230,6 +231,7 @@ export const useReservationsStore = defineStore("reservations", {
             try {
                 // Instancias de los stores
                 const carerStore = useCarersStore()
+                await carerStore.fetchCarers();
                 const ownerStore = useOwnerStore()
 
                 const query = {
@@ -252,11 +254,11 @@ export const useReservationsStore = defineStore("reservations", {
 
                 // Cargar datos adicionales de carer y owner
                 const relationsUsers = reservationBase.map(async (res) => {
-                    const carer = await carerStore.getCarerById(res.carerId)
+                    const carer = carerStore.getCarerById(res.carerId)
                     const owner = await ownerStore.getOwnerById(res.ownerId)
                     return {
                         ...res,
-                        carer: carer ? carer : 'Desconocido',
+                        carer: carer ? carer.user : 'Desconocido',
                         owner: owner ? owner : 'Desconocido',
                     }
                 })

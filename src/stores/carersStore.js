@@ -11,13 +11,6 @@ export const useCarersStore = defineStore('carers', {
 
     getters: {
         /**
-         * Obtener cuidador por ID desde el estado
-         */
-        getCarerById: (state) => (id) => {
-            return state.carers.find(c => c.id === id)
-        },
-
-        /**
          * Obtener nombre del cuidador
          */
         getCarerName: (state) => (id) => {
@@ -92,7 +85,7 @@ export const useCarersStore = defineStore('carers', {
             try {
                 const { data } = await CarerApi.getCarers()
                 this.carers = data || []
-                return data
+                //return data
             } catch (err) {
                 this.error = err.response?.data?.message || err.message || 'Error cargando cuidadores'
                 console.error('Error en fetchCarers:', err)
@@ -101,6 +94,14 @@ export const useCarersStore = defineStore('carers', {
                 this.loading = false
             }
         },
+
+        /**
+         * Obtener cuidador por ID desde el estado
+         */
+        getCarerById(id) {
+            return this.carers.find(c => c.user.id === id)
+        },
+
 
         /**
          * Obtener cuidador con servicios
