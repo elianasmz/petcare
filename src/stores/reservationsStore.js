@@ -1,6 +1,5 @@
 import {defineStore} from "pinia"
 import ReservationApi from "../api/ReservationApi.js"
-import {useUserStore} from "./userStore.js";
 import {useOwnerStore} from "./ownerStore.js";
 import {useCarersStore} from "./carersStore.js";
 import {useServicesStore} from "./servicesStore.js";
@@ -9,10 +8,8 @@ export const useReservationsStore = defineStore("reservations", {
     state: () => ({
         reservations: [], // Lista de reservaciones
         reservationServices: [], // Servicios asociados a una reservación
-
-        //id: 0, // ID de reservación actual
-        selectedReservation: null, // Detalle actual
-        selectedService: null,
+        selectedReservation: null, // Reservación seleccionada
+        selectedServices: null, // Servicios seleccionados de una reservación
 
         // Parámetros de paginación y ordenamiento
         pagitation: {
@@ -22,6 +19,14 @@ export const useReservationsStore = defineStore("reservations", {
             sortDir: 'DESC',
         },
 
+        // Información de paginación recibida del backend
+        pageable: {
+            pageNumber: 0,
+            pageSize: 10,
+            totalElements: 0,
+            totalPages: 0,
+        },
+
         // Estados de reservación
         states: {
             'PENDING': 'Pendiente',
@@ -29,7 +34,18 @@ export const useReservationsStore = defineStore("reservations", {
             'REJECTED': 'Rechazada',
             'FINISHED': 'Finalizada',
         },
+        statesBack:{
+            "Pendiente": "PENDING",
+            "Aceptada": "ACCEPTED",
+            "Rechazada": "REJECTED",
+            "Finalizada": "FINISHED",
+        },
 
+        // Filtros de búsqueda
+        filter: {
+            state: "Todas",
+            ownerId: null,
+        },
         // Estado de carga y errores
         loading: false,
         error: null,
@@ -59,15 +75,6 @@ export const useReservationsStore = defineStore("reservations", {
         getterReservationById: () => {
             return state.reservations.find(r => r.id === state.reservations.id)
         },
-
-        /**
-         * Obtiene la representación en texto del estado de una reservación.
-         * @param estado
-         * @returns {*|string}
-         */
-        getEstado(estado) {
-            return this.states[estado] || 'Desconocido'
-        },
     },
 
     actions: {
@@ -90,20 +97,24 @@ export const useReservationsStore = defineStore("reservations", {
                 // Obtener la reserva base
                 const reservationBase = await ReservationApi.getAllReservations(params || this.pagitation)
                 const reservation = reservationBase.data.content || []
+                // Actualizar la información de paginación
+                this.pageable.pageNumber = reservationBase.data.pageable.pageNumber;
+                this.pageable.pageSize = reservationBase.data.pageable.pageSize;
+                this.pageable.totalElements = reservationBase.data.totalElements;
+                this.pageable.totalPages = reservationBase.data.totalPages;
 
                 // Cargar datos adicionales de carer y owner
-                if (reservation) {
-                    const relationsUsers = reservation.map(async (res) => {
-                        const carer = await carerStore.getCarerById(res.carerId)
-                        const owner = await ownerStore.getOwnerById(res.ownerId)
-                        return {
-                            ...res,
-                            carer: carer ? carer : 'Desconocido',
-                            owner: owner ? owner : 'Desconocido',
-                        }
-                    })
-                    this.reservations = await Promise.all(relationsUsers)
-                }
+                const relationsUsers = reservation.map(async (res) => {
+                    const carer = await carerStore.getCarerById(res.carerId)
+                    const owner = await ownerStore.getOwnerById(res.ownerId)
+                    return {
+                        ...res,
+                        carer: carer ? carer : 'Desconocido',
+                        owner: owner ? owner : 'Desconocido',
+                    }
+                })
+                this.reservations = await Promise.all(relationsUsers)
+
             } catch (err) {
                 console.error("Error al obtener reservaciones:", err)
                 this.error = err.response?.data?.message || err.message || "Error al cargar reservaciones"
@@ -147,18 +158,17 @@ export const useReservationsStore = defineStore("reservations", {
 
                 // Obtener la reservación base
                 const reservationBase = await ReservationApi.getReservationById(id)
-                this.selectedReservation = reservationBase.data || null
+                const reservation = reservationBase.data || null
 
                 // Cargar datos adicionales de carer y owner
-                if (this.selectedReservation) {
-                    const carer = await carerStore.getCarerById(this.selectedReservation.carerId)
-                    const owner = await ownerStore.getOwnerById(this.selectedReservation.ownerId)
-                    this.selectedReservation = {
-                        ...this.selectedReservation,
-                        carer: carer ? carer : 'Desconocido',
-                        owner: owner ? owner : 'Desconocido',
-                    }
+                const carer = await carerStore.getCarerById(reservation.carerId)
+                const owner = await ownerStore.getOwnerById(reservation.ownerId)
+                this.selectedReservation = {
+                    ...reservation,
+                    carer: carer ? carer : 'Desconocido',
+                    owner: owner ? owner : 'Desconocido',
                 }
+
             } catch (err) {
                 console.error(`Error al obtener la reservación ${id}:`, err)
                 this.error = err.response?.data?.message || err.message || "Error al cargar la reservación"
@@ -211,15 +221,46 @@ export const useReservationsStore = defineStore("reservations", {
 
         /**
          * Busca reservaciones según los filtros proporcionados.
-         * @param filters {ownerId, carerId, dateFrom, dateTo, reservationState, page, size, sortBy, sortDir}
+         * @param filters {ownerId, carerId, startDate, endDate, reservationState, page, size, sortBy, sortDir}
          * @returns {Promise<void>}
          */
-        async searchReservations(filters = {}) {
+        async searchReservations(params = {}) {
             this.loading = true
             this.error = null
             try {
-                const res = await ReservationApi.searchReservations(filters)
-                this.reservations = res.data.content
+                // Instancias de los stores
+                const carerStore = useCarersStore()
+                const ownerStore = useOwnerStore()
+
+                const query = {
+                    ownerId: this.filter.ownerId || params.ownerId,
+                    state: this.filter.state !== "Todas" ? this.statesBack[this.filter.state] : undefined,
+                    page: params.page ?? this.pageable.pageNumber,
+                    size: params.size ?? this.pageable.pageSize,
+                    sortBy: params.sortBy || "serviceDate",
+                    sortDir: params.sortDir || "desc",
+                };
+
+                // Obtener la base de reservaciones
+                const res = await ReservationApi.searchReservations(query)
+                const reservationBase = res.data.content
+                // Actualizar la información de paginación
+                this.pageable.pageNumber = res.data.pageable.pageNumber;
+                this.pageable.pageSize = res.data.pageable.pageSize;
+                this.pageable.totalElements = res.data.totalElements;
+                this.pageable.totalPages = res.data.totalPages;
+
+                // Cargar datos adicionales de carer y owner
+                const relationsUsers = reservationBase.map(async (res) => {
+                    const carer = await carerStore.getCarerById(res.carerId)
+                    const owner = await ownerStore.getOwnerById(res.ownerId)
+                    return {
+                        ...res,
+                        carer: carer ? carer : 'Desconocido',
+                        owner: owner ? owner : 'Desconocido',
+                    }
+                })
+                this.reservations = await Promise.all(relationsUsers)
             } catch (err) {
                 console.error("Error al buscar reservaciones:", err)
                 this.error = err.response?.data?.message || err.message || "Error al buscar reservaciones"
@@ -236,7 +277,7 @@ export const useReservationsStore = defineStore("reservations", {
          * @param params
          * @returns {Promise<void>}
          */
-        async getAllReservationServices(params = {}) {
+        async getAllReservationServices(params = {sortDir: 'ASC'}) {
             this.loading = true
             this.error = null
             try {
@@ -244,20 +285,23 @@ export const useReservationsStore = defineStore("reservations", {
                 const serviceStore = useServicesStore()
 
                 // Obtener la base de servicios de reservación
-                const resBase = await ReservationApi.getAllRelations()
+                const resBase = await ReservationApi.getAllRelations({sortDir: 'ASC'})
                 const services = resBase.data.content || []
+                // Actualizar la información de paginación
+                //this.pageable.pageNumber = resBase.data.pageable.pageNumber;
+                //this.pageable.pageSize = resBase.data.pageable.pageSize;
+                //this.pageable.totalElements = resBase.data.totalElements;
+                //this.pageable.totalPages = resBase.data.totalPages;
 
                 // Cargar datos adicionales de service
-                if (services) {
-                    const relationsServices = services.map(async (rs) => {
-                        const service = await serviceStore.fetchServiceTypeById(rs.serviceId)
-                        return {
-                            ...rs,
-                            service: service ? service : 'Desconocido',
-                        }
-                    })
-                    this.reservationServices = await Promise.all(relationsServices)
-                }
+                const relationsServices = services.map(async (rs) => {
+                    const service = await serviceStore.fetchServiceTypeById(rs.serviceId)
+                    return {
+                        ...rs,
+                        service: service ? service : 'Desconocido',
+                    }
+                })
+                this.reservationServices = await Promise.all(relationsServices)
             } catch (err) {
                 console.error("Error al obtener los servicios de reservación:", err)
                 this.error = err.response?.data?.message || err.message || "Error al obtener los servicios de reservación"
@@ -299,7 +343,7 @@ export const useReservationsStore = defineStore("reservations", {
                 const serviceStore = useServicesStore()
 
                 // Obtener la base de servicios de reservación
-                const resBase = await ReservationApi.getRelationById(reservationId)
+                const resBase = await ReservationApi.getRelationById(reservationId, {sortDir: 'ASC'})
                 const services = resBase.data
 
                 // Cargar datos adicionales de service
@@ -310,7 +354,7 @@ export const useReservationsStore = defineStore("reservations", {
                         service: service ? service : 'Desconocido',
                     }
                 })
-                this.selectedService = await Promise.all(relationsServices)
+                this.selectedServices = await Promise.all(relationsServices)
             } catch (err) {
                 console.error("Error al obtener los servicios de la reservación:", err)
                 this.error = err.response?.data?.message || err.message || "Error al obtener los servicios de la reservación"
@@ -374,20 +418,24 @@ export const useReservationsStore = defineStore("reservations", {
                 // Obtener la base de servicios de reservación
                 const resBase = await ReservationApi.getServicesByReservation(reservationId)
                 const services = resBase.data || []
-                console.log(services)
+                // Actualizar la información de paginación
+                this.pageable.pageNumber = resBase.data.pageable?.pageNumber || 0;
+                this.pageable.pageSize = resBase.data.pageable?.pageSize || services.length;
+                this.pageable.totalElements = resBase.data.totalElements || services.length;
+                this.pageable.totalPages = resBase.data.totalPages || 1;
+
                 // Cargar datos adicionales de service
-                if (services) {
-                    const relationsServices = services.map(async (rs) => {
-                        const service = await serviceStore.fetchServiceTypeById(rs.serviceId)
-                        console.log(service)
-                        return {
-                            ...rs,
-                            service: service ? service : 'Desconocido',
-                        }
-                    })
-                    this.reservationServices = await Promise.all(relationsServices)
-                    console.log(this.reservationServices)
-                }
+                const relationsServices = services.map(async (rs) => {
+                    const service = await serviceStore.fetchServiceTypeById(rs.serviceId)
+                    console.log(service)
+                    return {
+                        ...rs,
+                        service: service ? service : 'Desconocido',
+                    }
+                })
+                this.selectedService = await Promise.all(relationsServices)
+                console.log(this.selectedService.target)
+
             } catch (err) {
                 console.error("Error al obtener los servicios de la reservación:", err)
                 this.error = err.response?.data?.message || err.message || "Error al obtener los servicios de la reservación"
@@ -443,8 +491,20 @@ export const useReservationsStore = defineStore("reservations", {
             this.loading = true
             this.error = null
             try {
+                // Instancia del store de services
+                const serviceStore = useServicesStore()
+                //
                 const res = await ReservationApi.searchRelations(filters)
-                this.reservationServices = res.data.content
+                const resBase = res.data.content
+                // Cargar datos adicionales de service
+                const relationsServices = resBase.map(async (rs) => {
+                    const service = await serviceStore.fetchServiceTypeById(rs.serviceId)
+                    return {
+                        ...rs,
+                        service: service ? service : 'Desconocido',
+                    }
+                })
+                this.reservationServices = await Promise.all(relationsServices)
             } catch (err) {
                 console.error("Error al buscar relaciones de reservación:", err)
                 this.error = err.response?.data?.message || err.message || "Error al buscar relaciones de reservación"
