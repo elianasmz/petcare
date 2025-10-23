@@ -318,7 +318,6 @@ function getAvailabilityLabel(state) {
         <table class="table table-hover">
           <thead class="table-light">
             <tr>
-              <th>ID</th>
               <th>Tipo de Servicio</th>
               <th>Descripción</th>
               <th>Precio</th>
@@ -328,7 +327,6 @@ function getAvailabilityLabel(state) {
           </thead>
           <tbody>
             <tr v-for="service in servicesStore.services" :key="service.id">
-              <td>{{ service.id }}</td>
               <td>{{ getServiceTypeName(service.serviceTypeId) }}</td>
               <td>{{ service.description || '-' }}</td>
               <td class="text-success fw-bold">Gs. {{ service.price.toLocaleString('es-PY') }}</td>
