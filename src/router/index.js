@@ -10,7 +10,9 @@ import CarerList from '../views/CarerList.vue'
 import CarerDetail from '../views/CarerDetail.vue';
 import CarerReservations from '../views/CarerReservations.vue';
 import PayReservations from '../views/PayReservations.vue';
+
 import PruebaReservation from '../views/PruebaReservation.vue';
+import ReservationView from '../views/ReservationView.vue';
 
 const routes = [
 
@@ -25,7 +27,8 @@ const routes = [
   { path: "/caretakers/:id", name: "CarerDetail", component: CarerDetail, props: true },
   { path: "/carer-reservations", name:"CarerReservations", component: CarerReservations},
   { path: '/reservation/:id/pay', name: 'PayReservations', component: PayReservations, props: true },
-    { path: "/prueba-reservations", name:"PruebaReservation", component: PruebaReservation}
+    { path: "/prueba-reservations", name:"PruebaReservation", component: PruebaReservation},
+    { path: "/reservationsview", name:"ReservationView", component: ReservationView}
 ];
 
 const router = createRouter({
