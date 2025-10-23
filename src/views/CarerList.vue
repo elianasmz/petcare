@@ -2,9 +2,11 @@
 import { ref, computed, onMounted } from "vue"
 import { useRouter } from "vue-router"
 import { useServicesStore } from "../stores/servicesStore.js"
+import { useCarersStore } from "../stores/carersStore.js"
 
 const router = useRouter()
 const servicesStore = useServicesStore()
+const carersStore = useCarersStore()
 
 const selectedServiceType = ref("Todos")
 const searchQuery = ref("")
@@ -12,12 +14,14 @@ const maxPrice = ref(null)
 const loading = ref(false)
 const error = ref(null)
 
+const carers = ref([])
+
 // Cargar datos al montar
 onMounted(async () => {
   loading.value = true
   try {
     await servicesStore.fetchServiceTypes()
-    await servicesStore.fetchServices({ page: 0, size: 100 })
+    await loadCarersWithServices()
   } catch (err) {
     error.value = "Error cargando datos"
     console.error(err)
@@ -26,75 +30,90 @@ onMounted(async () => {
   }
 })
 
+// Cargar cuidadores con sus servicios desde el backend
+async function loadCarersWithServices() {
+  try {
+    // 1. Obtener todos los cuidadores (sin servicios)
+    const allCarers = await carersStore.fetchCarers()
+    
+    // 2. Para cada cuidador, obtener sus servicios
+    const carersWithServices = await Promise.all(
+      allCarers.map(async (carer) => {
+        try {
+          // Obtener servicios del cuidador
+          await servicesStore.fetchServicesByCarerId(carer.id, { page: 0, size: 100 })
+          
+          return {
+            id: carer.id,
+            name: `${carer.user.name} ${carer.user.lastName}`,
+            photo: carer.user.profilePhoto || `https://randomuser.me/api/portraits/${carer.id % 2 === 0 ? 'men' : 'women'}/${(carer.id * 10) % 100}.jpg`,
+            description: `Estado: ${translateAvailabilityState(carer.availabilityState)}. Capacidad: ${carer.amountPet} mascotas`,
+            email: carer.user.email,
+            phoneNumber: carer.user.phoneNumber,
+            availabilityState: carer.availabilityState,
+            amountPet: carer.amountPet,
+            services: servicesStore.services.map(service => ({
+              id: service.id,
+              name: getServiceTypeName(service.serviceTypeId),
+              price: service.price,
+              description: service.description || ''
+            }))
+          }
+        } catch (err) {
+          console.error(`Error loading services for carer ${carer.id}:`, err)
+          // Retornar cuidador sin servicios si falla
+          return {
+            id: carer.id,
+            name: `${carer.user.name} ${carer.user.lastName}`,
+            photo: carer.user.profilePhoto || `https://randomuser.me/api/portraits/${carer.id % 2 === 0 ? 'men' : 'women'}/${(carer.id * 10) % 100}.jpg`,
+            description: `Estado: ${translateAvailabilityState(carer.availabilityState)}. Capacidad: ${carer.amountPet} mascotas`,
+            email: carer.user.email,
+            phoneNumber: carer.user.phoneNumber,
+            availabilityState: carer.availabilityState,
+            amountPet: carer.amountPet,
+            services: []
+          }
+        }
+      })
+    )
+    
+    // Solo mostrar carers con servicios
+    carers.value = carersWithServices.filter(c => c.services.length > 0)
+  } catch (err) {
+    console.error('Error loading carers:', err)
+    error.value = 'Error cargando cuidadores'
+    throw err
+  }
+}
+
+// Traducir estado de disponibilidad
+function translateAvailabilityState(state) {
+  const translations = {
+    'AVAILABLE': 'Disponible',
+    'NOT_AVAILABLE': 'No disponible',
+    'BUSY': 'Ocupado'
+  }
+  return translations[state] || state
+}
+
 // Obtener nombre del tipo de servicio por ID
 function getServiceTypeName(typeId) {
   const type = servicesStore.serviceTypes.find(t => t.id === typeId)
   return type ? type.name : `Tipo ${typeId}`
 }
 
-// Datos hardcodeados de cuidadores (temporal hasta Entrega #4)
-const carerData = {
-  1: {
-    name: "Laura Gómez",
-    photo: "https://randomuser.me/api/portraits/women/44.jpg",
-    description: "Amante de los animales con 5 años de experiencia"
-  },
-  2: {
-    name: "Carlos Díaz",
-    photo: "https://randomuser.me/api/portraits/men/32.jpg",
-    description: "Veterinario estudiante, especializado en mascotas pequeñas"
-  }
-}
-
-// Obtener datos del cuidador
-function getCarerData(carerId) {
-  return carerData[carerId] || {
-    name: `Cuidador #${carerId}`,
-    photo: `https://randomuser.me/api/portraits/${carerId % 2 === 0 ? 'men' : 'women'}/${(carerId * 10) % 100}.jpg`,
-    description: "Cuidador profesional de mascotas"
-  }
-}
-
-// Agrupar servicios por cuidador
-const caretakers = computed(() => {
-  const grouped = {}
-
-  servicesStore.services.forEach(service => {
-    const carerId = service.carerId
-    
-    if (!grouped[carerId]) {
-      const carerInfo = getCarerData(carerId)
-      grouped[carerId] = {
-        id: carerId,
-        name: carerInfo.name,
-        photo: carerInfo.photo,
-        description: carerInfo.description,
-        services: []
-      }
-    }
-
-    grouped[carerId].services.push({
-      id: service.id,
-      name: getServiceTypeName(service.serviceTypeId),
-      price: service.price,
-      description: service.description || ''
-    })
-  })
-
-  return Object.values(grouped)
-})
-
 // Obtener todos los tipos de servicio disponibles
 const allServiceTypes = computed(() => {
   const types = ["Todos"]
   const uniqueTypes = new Set()
   
-  servicesStore.services.forEach(service => {
-    const typeName = getServiceTypeName(service.serviceTypeId)
-    if (!uniqueTypes.has(typeName)) {
-      uniqueTypes.add(typeName)
-      types.push(typeName)
-    }
+  carers.value.forEach(carer => {
+    carer.services.forEach(service => {
+      if (!uniqueTypes.has(service.name)) {
+        uniqueTypes.add(service.name)
+        types.push(service.name)
+      }
+    })
   })
   
   return types
@@ -102,7 +121,7 @@ const allServiceTypes = computed(() => {
 
 // Filtrar cuidadores
 const filteredCaretakers = computed(() => {
-  return caretakers.value.filter(caretaker => {
+  return carers.value.filter(caretaker => {
     const matchesService =
       selectedServiceType.value === "Todos" ||
       caretaker.services.some(s => s.name === selectedServiceType.value)
@@ -136,7 +155,7 @@ function viewDetail(caretaker) {
     <!-- Cargando -->
     <div v-if="loading" class="text-center py-5">
       <div class="spinner-border me-2"></div>
-      <p>Cargando servicios...</p>
+      <p>Cargando cuidadores...</p>
     </div>
 
     <template v-else>
@@ -189,7 +208,12 @@ function viewDetail(caretaker) {
                     width="60"
                     height="60"
                   />
-                  <h5 class="card-title mb-0">{{ caretaker.name }}</h5>
+                  <div>
+                    <h5 class="card-title mb-0">{{ caretaker.name }}</h5>
+                    <small class="text-muted">
+                      <i class="bi bi-envelope"></i> {{ caretaker.email }}
+                    </small>
+                  </div>
                 </div>
                 <button class="btn btn-primary btn-sm" @click="viewDetail(caretaker)">
                   Ver Detalle
@@ -198,7 +222,9 @@ function viewDetail(caretaker) {
 
               <p class="card-text mb-3">{{ caretaker.description }}</p>
 
-              <h6 class="fw-bold mb-2">Servicios:</h6>
+              <h6 class="fw-bold mb-2">
+                Servicios ({{ caretaker.services.length }}):
+              </h6>
               <div class="services-list">
                 <div
                   v-for="service in caretaker.services"
