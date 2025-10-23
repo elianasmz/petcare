@@ -138,7 +138,6 @@ function goToPayment(reservaId) {
                 {{ reservationStore.states[reserva.reservationState] }}
               </span>
                 </h5>
-
                 <strong>Servicios:</strong>
                 <p
                     v-for="rel in reservationStore.reservationServices.filter(
@@ -149,7 +148,6 @@ function goToPayment(reservaId) {
                 >
                   {{ rel.service.name }}
                 </p>
-
                 <p>
                   <strong>Fecha:</strong> {{ formatDate(reserva.serviceDate) }}
                 </p>
