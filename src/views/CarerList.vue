@@ -35,12 +35,12 @@ function getServiceTypeName(typeId) {
 // Datos hardcodeados de cuidadores (temporal hasta Entrega #4)
 const carerData = {
   1: {
-    name: "María López",
+    name: "Laura Gómez",
     photo: "https://randomuser.me/api/portraits/women/44.jpg",
     description: "Amante de los animales con 5 años de experiencia"
   },
   2: {
-    name: "Carlos Pérez",
+    name: "Carlos Díaz",
     photo: "https://randomuser.me/api/portraits/men/32.jpg",
     description: "Veterinario estudiante, especializado en mascotas pequeñas"
   }
