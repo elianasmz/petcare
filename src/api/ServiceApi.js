@@ -4,7 +4,7 @@ class ServiceApi {
     constructor() {
         this.serviceApi = getAxiosInstance('service') // Microservicio en el puerto 8083
 
-        // Interceptor de respuesta para manejo global de errores (opcional)
+        // Interceptor de respuesta para manejo global de errores
         this.serviceApi.interceptors.response.use(
             response => response,
             error => {
@@ -14,7 +14,8 @@ class ServiceApi {
         )
     }
     
-    // ================= Tipos de servicio =================
+    // ==================== SERVICE TYPES ====================
+    
     getServiceTypes(params = {}) {
         return this.serviceApi.get('/service-types', { params })
     }
@@ -35,7 +36,8 @@ class ServiceApi {
         return this.serviceApi.delete(`/service-types/${id}`)
     }
 
-    // ================= Servicios =================
+    // ==================== SERVICES ====================
+    
     getServices(params = {}) {
         return this.serviceApi.get('/services', { params })
     }
@@ -54,6 +56,66 @@ class ServiceApi {
 
     deleteService(id) {
         return this.serviceApi.delete(`/services/${id}`)
+    }
+
+    // ==================== SERVICES - FILTROS ====================
+    
+    /**
+     * Obtener servicios de un cuidador
+     * GET /services/carer/{carerId}
+     */
+    getServicesByCarerId(carerId, params = {}) {
+        return this.serviceApi.get(`/services/carer/${carerId}`, { params })
+    }
+
+    /**
+     * Obtener servicios por tipo
+     * GET /services/type/{serviceTypeId}
+     */
+    getServicesByServiceTypeId(serviceTypeId, params = {}) {
+        return this.serviceApi.get(`/services/type/${serviceTypeId}`, { params })
+    }
+
+    /**
+     * Obtener servicios por rango de precio
+     * GET /services/price-range/{minPrice}/{maxPrice}
+     */
+    getServicesByPriceRange(minPrice, maxPrice, params = {}) {
+        return this.serviceApi.get(`/services/price-range/${minPrice}/${maxPrice}`, { params })
+    }
+
+    /**
+     * Obtener servicios por cuidador y tipo
+     * GET /services/carer/{carerId}/type/{serviceTypeId}
+     */
+    getServicesByCarerAndType(carerId, serviceTypeId, params = {}) {
+        return this.serviceApi.get(`/services/carer/${carerId}/type/${serviceTypeId}`, { params })
+    }
+
+    // ==================== CARER WITH SERVICES ====================
+    
+    /**
+     * Crear cuidador con servicios (cabecera-detalle)
+     * POST /carers-with-services
+     */
+    createCarerWithServices(data) {
+        return this.serviceApi.post('/carers-with-services', data)
+    }
+
+    /**
+     * Obtener cuidador con servicios
+     * GET /carers-with-services/{carerId}
+     */
+    getCarerWithServices(carerId) {
+        return this.serviceApi.get(`/carers-with-services/${carerId}`)
+    }
+
+    /**
+     * Actualizar cuidador con servicios (cabecera-detalle)
+     * PUT /carers-with-services/{carerId}
+     */
+    updateCarerWithServices(carerId, data) {
+        return this.serviceApi.put(`/carers-with-services/${carerId}`, data)
     }
 }
 

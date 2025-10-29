@@ -1,21 +1,27 @@
 <script setup>
-import { onMounted, ref, reactive, computed } from "vue"
+import { onMounted, ref, reactive } from "vue"
 import { useServicesStore } from "../stores/servicesStore.js"
 
 const servicesStore = useServicesStore()
-const carerId = ref(1) // Simula cuidador logueado
+const carerId = ref(9) // Simula cuidador logueado
 
 // Referencia al formulario de servicio
 const serviceFormRef = ref(null)
 
 // Datos del cuidador
 const caretaker = reactive({
-  id: carerId.value,
-  name: "María López",
-  email: "maria@example.com",
-  phone: "099123456",
-  bio: "Amante de los animales con 5 años de experiencia.",
-  photo: "https://randomuser.me/api/portraits/women/44.jpg",
+  id: null,
+  user: {
+    id: null,
+    name: "",
+    lastName: "",
+    email: "",
+    phoneNumber: "",
+    profilePhoto: ""
+  },
+  availabilityState: "",
+  amountPet: 0,
+  bio: "",
 })
 
 // Formulario de servicio (crear/editar)
@@ -27,12 +33,45 @@ const serviceForm = reactive({
 })
 
 const isEditing = ref(false) // Modo edición
+const loadingCarer = ref(false)
 
 // Cargar datos al montar
 onMounted(async () => {
+  await loadCarerData()
   await servicesStore.fetchServiceTypes()
   await servicesStore.fetchServicesByCarerId(carerId.value)
 })
+
+async function loadCarerData() {
+  loadingCarer.value = true
+  try {
+    const data = await servicesStore.fetchCarerWithServices(carerId.value)
+
+    // Mapear datos del backend al objeto reactivo
+    caretaker.id = data.id
+    caretaker.user = {
+      id: data.user.id,
+      name: data.user.name,
+      lastName: data.user.lastName,
+      email: data.user.email,
+      phoneNumber: data.user.phoneNumber,
+      profilePhoto: data.user.profilePhoto || "https://randomuser.me/api/portraits/women/90.jpg"
+    }
+    caretaker.availabilityState = data.availabilityState
+    caretaker.amountPet = data.amountPet
+    caretaker.bio = "Amante de los animales con experiencia." // Temporal
+
+  } catch (err) {
+    console.error('Error cargando datos del cuidador:', err)
+    // Fallback con datos por defecto
+    caretaker.user.name = "Cuidador"
+    caretaker.user.lastName = "Anónimo"
+    caretaker.user.email = "cuidador@example.com"
+    caretaker.user.profilePhoto = "https://randomuser.me/api/portraits/women/90.jpg"
+  } finally {
+    loadingCarer.value = false
+  }
+}
 
 // Obtener nombre del tipo de servicio por ID
 function getServiceTypeName(typeId) {
@@ -73,13 +112,13 @@ function editService(service) {
   serviceForm.typeId = service.serviceTypeId
   serviceForm.price = service.price
   serviceForm.description = service.description || ""
-  
+
   // Scroll al formulario usando la referencia
   setTimeout(() => {
     if (serviceFormRef.value) {
-      serviceFormRef.value.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'start' 
+      serviceFormRef.value.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
       })
     }
   }, 100)
@@ -103,7 +142,7 @@ async function updateService() {
       description: serviceForm.description || null,
       price: Number(serviceForm.price)
     })
-    
+
     resetForm()
     alert("Servicio actualizado exitosamente")
   } catch (err) {
@@ -147,7 +186,20 @@ function triggerFileInput() {
 function handleFileChange(event) {
   const file = event.target.files[0]
   if (file) {
-    caretaker.photo = URL.createObjectURL(file)
+    caretaker.user.profilePhoto = URL.createObjectURL(file)
+  }
+}
+
+function getAvailabilityLabel(state) {
+  switch (state) {
+    case "AVAILABLE":
+      return "Disponible"
+    case "NOT_AVAILABLE":
+      return "No Disponible"
+    case "BUSY":
+      return "Ocupado"
+    default:
+      return "Desconocido"
   }
 }
 </script>
@@ -162,14 +214,18 @@ function handleFileChange(event) {
       <button type="button" class="btn-close" @click="servicesStore.error = null"></button>
     </div>
 
+    <!-- Loading del perfil -->
+    <div v-if="loadingCarer" class="text-center py-5">
+      <div class="spinner-border me-2"></div>
+      <p>Cargando perfil del cuidador...</p>
+    </div>
+
     <!-- Perfil -->
     <div class="card mb-4 p-3 shadow-sm d-flex flex-row align-items-start gap-4">
       <div class="position-relative">
-        <img :src="caretaker.photo" alt="Foto" class="rounded-circle" width="120" height="120" />
-        <button type="button"
-          class="btn btn-sm btn-light position-absolute bottom-0 end-0"
-          style="border-radius:50%; padding:0.25rem;"
-          @click="triggerFileInput">
+        <img :src="caretaker.user.profilePhoto" alt="Foto" class="rounded-circle" width="120" height="120" />
+        <button type="button" class="btn btn-sm btn-light position-absolute bottom-0 end-0"
+          style="border-radius:50%; padding:0.25rem;" @click="triggerFileInput">
           ✏️
         </button>
         <input type="file" ref="fileInput" class="d-none" @change="handleFileChange" />
@@ -178,15 +234,23 @@ function handleFileChange(event) {
       <div class="flex-grow-1">
         <div class="mb-3">
           <label class="form-label">Nombre</label>
-          <input v-model="caretaker.name" class="form-control" />
+          <input :value="`${caretaker.user.name} ${caretaker.user.lastName}`.trim()" class="form-control" readonly />
         </div>
         <div class="mb-3">
           <label class="form-label">Email</label>
-          <input v-model="caretaker.email" class="form-control" />
+          <input v-model="caretaker.user.email" class="form-control" readonly />
         </div>
         <div class="mb-3">
           <label class="form-label">Teléfono</label>
-          <input v-model="caretaker.phone" class="form-control" />
+          <input v-model="caretaker.user.phoneNumber" class="form-control" readonly />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Estado de Disponibilidad</label>
+          <input :value="getAvailabilityLabel(caretaker.availabilityState)" class="form-control" readonly />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Cantidad de Mascotas</label>
+          <input v-model.number="caretaker.amountPet" type="number" class="form-control" readonly />
         </div>
         <div class="mb-3">
           <label class="form-label">Biografía</label>
@@ -201,11 +265,7 @@ function handleFileChange(event) {
       <h5>Mis Servicios</h5>
 
       <!-- Formulario: Agregar/Editar servicio -->
-      <div 
-        ref="serviceFormRef"
-        class="card p-3 mb-3" 
-        :class="isEditing ? 'border-warning' : 'bg-light'"
-      >
+      <div ref="serviceFormRef" class="card p-3 mb-3" :class="isEditing ? 'border-warning' : 'bg-light'">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <h6>{{ isEditing ? 'Editar Servicio' : 'Agregar Nuevo Servicio' }}</h6>
           <button v-if="isEditing" class="btn btn-sm btn-secondary" @click="resetForm">
@@ -223,44 +283,24 @@ function handleFileChange(event) {
               </option>
             </select>
           </div>
-          
+
           <div class="col-md-3">
-            <label class="form-label">Precio</label>
-            <input 
-              type="number" 
-              v-model.number="serviceForm.price" 
-              class="form-control"
-              placeholder="0.00"
-              step="0.01"
-              min="0"
-            />
+            <label class="form-label">Precio (Gs.)</label>
+            <input type="number" v-model.number="serviceForm.price" class="form-control" placeholder="0.00" step="0.01"
+              min="0" />
           </div>
-          
+
           <div class="col-md-5">
             <label class="form-label">Descripción (opcional)</label>
-            <input 
-              type="text" 
-              v-model="serviceForm.description" 
-              class="form-control" 
-              placeholder="Ej. Incluye paseo de 30 minutos"
-            />
+            <input type="text" v-model="serviceForm.description" class="form-control"
+              placeholder="Ej. Incluye paseo de 30 minutos" />
           </div>
 
           <div class="col-12">
-            <button 
-              v-if="!isEditing"
-              class="btn btn-primary" 
-              @click="addService"
-              :disabled="servicesStore.loading"
-            >
+            <button v-if="!isEditing" class="btn btn-primary" @click="addService" :disabled="servicesStore.loading">
               {{ servicesStore.loading ? 'Guardando...' : 'Agregar Servicio' }}
             </button>
-            <button 
-              v-else
-              class="btn btn-warning" 
-              @click="updateService"
-              :disabled="servicesStore.loading"
-            >
+            <button v-else class="btn btn-warning" @click="updateService" :disabled="servicesStore.loading">
               {{ servicesStore.loading ? 'Actualizando...' : 'Guardar Cambios' }}
             </button>
           </div>
@@ -278,7 +318,6 @@ function handleFileChange(event) {
         <table class="table table-hover">
           <thead class="table-light">
             <tr>
-              <th>ID</th>
               <th>Tipo de Servicio</th>
               <th>Descripción</th>
               <th>Precio</th>
@@ -288,7 +327,6 @@ function handleFileChange(event) {
           </thead>
           <tbody>
             <tr v-for="service in servicesStore.services" :key="service.id">
-              <td>{{ service.id }}</td>
               <td>{{ getServiceTypeName(service.serviceTypeId) }}</td>
               <td>{{ service.description || '-' }}</td>
               <td class="text-success fw-bold">Gs. {{ service.price.toLocaleString('es-PY') }}</td>
@@ -297,18 +335,12 @@ function handleFileChange(event) {
                 <span v-else class="badge bg-secondary">Inactivo</span>
               </td>
               <td>
-                <button 
-                  class="btn btn-sm btn-outline-primary me-2" 
-                  @click="editService(service)" 
-                  :disabled="servicesStore.loading"
-                >
+                <button class="btn btn-sm btn-outline-primary me-2" @click="editService(service)"
+                  :disabled="servicesStore.loading">
                   <i class="bi bi-pencil"></i> Editar
                 </button>
-                <button 
-                  class="btn btn-sm btn-outline-secondary" 
-                  @click="deleteService(service)" 
-                  :disabled="servicesStore.loading"
-                >
+                <button class="btn btn-sm btn-outline-secondary" @click="deleteService(service)"
+                  :disabled="servicesStore.loading">
                   <i class="bi bi-trash"></i> Eliminar
                 </button>
               </td>
@@ -349,5 +381,11 @@ button:disabled {
 .spinner-border-sm {
   width: 1rem;
   height: 1rem;
+}
+
+input:read-only,
+select:disabled {
+  background-color: #e9ecef;
+  cursor: not-allowed;
 }
 </style>

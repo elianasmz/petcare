@@ -56,7 +56,7 @@ class ReservationApi {
 
     /**
      * Buscar reservaciones por filtros
-     * @param filters {ownerId, carerId, dateFrom, dateTo, reservationState, page, size, sortBy, sortDir}
+     * @param filters {ownerId, carerId, startDate, endDate, reservationState, page, size, sortBy, sortDir}
      * @returns {Promise<axios.AxiosResponse<any>>}
      */
     searchReservations(filters = {}) {
