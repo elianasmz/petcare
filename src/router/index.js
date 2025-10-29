@@ -26,7 +26,7 @@ const routes = [
     // Reservations routes
     { path: '/reservations', name: 'Reservations', component: OwnerReservationView },
   { path: "/caretakers/:id", name: "CarerDetail", component: CarerDetail, props: true },
-  { path: "/carer-reservations", name:"CarerReservations", component: CarerReservations},
+  { path: "/carer-reservations", name:"CarerReservations", component: CarerReservationView},
   { path: '/reservation/:id/pay', name: 'PayReservations', component: PayReservations, props: true },
     { path: "/prueba-reservations", name:"PruebaReservation", component: PruebaReservation},
     { path: "/reservationsview", name:"ReservationView", component: CarerReservationView}

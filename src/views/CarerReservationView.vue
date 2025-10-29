@@ -18,8 +18,14 @@ onMounted(async () => {
 });
 
 // 🧩 Filtramos reservas según estado
-const receivedReservations = computed(() => reservationStore.reservations.filter((r) => reservationStore.states[r.reservationState] === "Pendiente"));
-const activeReservations = computed(() => reservationStore.reservations.filter((r) => reservationStore.states[r.reservationState] === "Aceptada"));
+const receivedReservations = computed(() =>
+    reservationStore.reservations.filter((r) =>
+        reservationStore.states[r.reservationState] === "Pendiente"
+    ));
+const activeReservations = computed(() =>
+    reservationStore.reservations.filter((r) =>
+        reservationStore.states[r.reservationState] === "Aceptada"
+    ));
 
 // 🔁 Acciones sobre reservas
 async function acceptReservation(reservation) {
