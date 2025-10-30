@@ -12,7 +12,8 @@ import CarerReservations from '../views/CarerReservations.vue';
 import PayReservations from '../views/PayReservations.vue';
 
 import PruebaReservation from '../views/PruebaReservation.vue';
-import ReservationView from '../views/ReservationView.vue';
+import OwnerReservationView from '../views/OwnerReservationView.vue';
+import CarerReservationView from '../views/CarerReservationView.vue';
 
 const routes = [
 
@@ -23,12 +24,12 @@ const routes = [
   { path: '/carer', name: 'CarerDashboard', component: CarerDashboard },
 
     // Reservations routes
-    { path: '/reservations', name: 'Reservations', component: Reservations },
+    { path: '/reservations', name: 'Reservations', component: OwnerReservationView },
   { path: "/caretakers/:id", name: "CarerDetail", component: CarerDetail, props: true },
-  { path: "/carer-reservations", name:"CarerReservations", component: CarerReservations},
+  { path: "/carer-reservations", name:"CarerReservations", component: CarerReservationView},
   { path: '/reservation/:id/pay', name: 'PayReservations', component: PayReservations, props: true },
     { path: "/prueba-reservations", name:"PruebaReservation", component: PruebaReservation},
-    { path: "/reservationsview", name:"ReservationView", component: ReservationView}
+    { path: "/reservationsview", name:"ReservationView", component: CarerReservationView}
 ];
 
 const router = createRouter({

@@ -102,6 +102,30 @@ export const useCarersStore = defineStore('carers', {
             }
         },
 
+        async fetchAllCarers() {
+            this.loading = true
+            this.error = null
+            try {
+                const { data } = await CarerApi.getCarers()
+                this.carers = data || []
+                return data
+            } catch (err) {
+                this.error = err.response?.data?.message || err.message || 'Error cargando cuidadores'
+                console.error('Error en fetchCarers:', err)
+                throw err
+            } finally {
+                this.loading = false
+            }
+        },
+
+        /**
+         * Obtener cuidador por ID desde el estado
+         */
+        getCarerByIdMy(id) {
+            return this.carers.find(c => c.user.id === id)
+        },
+
+
         /**
          * Obtener cuidador con servicios
          * GET /carers-with-services/{carerId}
