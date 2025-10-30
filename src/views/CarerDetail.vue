@@ -1,63 +1,73 @@
 <script setup>
-import { ref, computed } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { ref, computed, onMounted } from "vue";
+import { useRouter } from "vue-router";
+// 1. Importar los stores reales
+import { useUsersStore } from "../stores/usersStore.js";
+import { useServicesStore } from "../stores/servicesStore.js";
+// (No necesitas useRoute si usas props)
 
-// Lista de cuidadores con precios por servicio
-const caretakers = [
-  {
-    id: 1,
-    name: "María López",
-    photo: "https://randomuser.me/api/portraits/women/44.jpg",
-    description: "Amante de los animales con 5 años de experiencia cuidando perros y gatos.",
-    services: [
-      { name: "Paseos", price: 15 },
-      { name: "Hospedaje", price: 30 },
-      { name: "Visitas a domicilio", price: 20 }
-    ]
-  },
-  {
-    id: 2,
-    name: "Carlos Pérez",
-    photo: "https://randomuser.me/api/portraits/men/32.jpg",
-    description: "Veterinario estudiante, especializado en mascotas pequeñas.",
-    services: [
-      { name: "Atención básica", price: 10 },
-      { name: "Paseos", price: 15 },
-      { name: "Baños", price: 25 }
-    ]
-  },
-  {
-    id: 3,
-    name: "Ana Gómez",
-    photo: "https://randomuser.me/api/portraits/women/68.jpg",
-    description: "Ofrezco cuidado responsable y amoroso para perros grandes.",
-    services: [
-      { name: "Entrenamiento básico", price: 20 },
-      { name: "Hospedaje", price: 35 },
-      { name: "Paseos largos", price: 25 }
-    ]
+// 2. Definir 'props' para recibir el ID del router
+// (Tu router/index.js ya tiene 'props: true' para esta ruta, lo cual es perfecto)
+const props = defineProps({
+  id: {
+    type: [String, Number],
+    required: true
   }
-];
+});
 
-const route = useRoute();
 const router = useRouter();
 
-const caretaker = caretakers.find(c => c.id === Number(route.params.id));
+// 3. Obtener los stores
+const userStore = useUsersStore();
+const servicesStore = useServicesStore();
 
-// Selecciones de reserva
-const selectedServices = ref([]);
+const loading = ref(false);
+const error = ref(null);
+
+// 4. Referencias a los datos de los stores
+const carerProfile = computed(() => userStore.currentUser);
+const carerServices = computed(() => servicesStore.services);
+
+// 5. Cargar los datos reales del backend al montar
+onMounted(async () => {
+  loading.value = true;
+  error.value = null;
+  // Limpiar stores de datos anteriores
+  userStore.clearCurrentUser();
+  servicesStore.clearServices();
+  
+  const carerId = Number(props.id);
+  
+  try {
+    // Cargar tipos de servicio (para los nombres) y los datos del cuidador/servicios en paralelo
+    await Promise.all([
+      servicesStore.fetchServiceTypes(), // Para saber el nombre de "Paseo", "Alojamiento"
+      userStore.fetchUserById(carerId),
+      servicesStore.fetchServices({ carerId: carerId, size: 100 })
+    ]);
+  } catch (err) {
+    console.error("Error fetching data:", err);
+    error.value = "No se pudo cargar la información del cuidador.";
+  } finally {
+    loading.value = false;
+  }
+});
+
+// --- Lógica del Formulario de Reserva (se mantiene casi igual) ---
+const selectedServices = ref([]); // Almacenará los IDs de servicio
 const reservationDate = ref("");
 const note = ref("");
 
-// Total calculado
+// 6. Total calculado (ahora usa 'carerServices' del store)
 const totalPrice = computed(() => {
-  return selectedServices.value.reduce((sum, serviceName) => {
-    const service = caretaker.services.find(s => s.name === serviceName);
+  return selectedServices.value.reduce((sum, serviceId) => {
+    // Busca el servicio en la lista del store
+    const service = carerServices.value.find(s => s.id === serviceId);
     return sum + (service ? service.price : 0);
   }, 0);
 });
 
-// Función para confirmar reserva
+// 7. Función para confirmar reserva (simulada por ahora)
 function bookCaretaker() {
   if (selectedServices.value.length === 0) {
     alert("Debes seleccionar al menos un servicio.");
@@ -68,47 +78,76 @@ function bookCaretaker() {
     return;
   }
 
-  alert(
-    `Reserva creada para ${caretaker.name}\nServicios: ${selectedServices.value.join(", ")}\nFecha: ${reservationDate.value}\nNota: ${note.value}\nTotal: $${totalPrice.value}`
-  );
+  // Esto es lo que se enviará al 'reservation-microservice'
+  const reservationData = {
+    carerId: Number(props.id),
+    ownerId: 1, // TODO: Obtener el ID del usuario logueado (dueño)
+    serviceIds: selectedServices.value,
+    reservationDate: reservationDate.value,
+    note: note.value,
+    totalPrice: totalPrice.value
+  };
 
-  // Reset campos
-  selectedServices.value = [];
-  reservationDate.value = "";
-  note.value = "";
-  router.push("/caretakers"); // Volver al listado
+  console.log("Datos de la reserva:", reservationData);
+  alert(`Reserva simulada creada. Total: Gs. ${totalPrice.value.toLocaleString('es-PY')}`);
+  
+  // TODO: Llamar a reservationStore.createReservation(reservationData)
+  
+  router.push("/reservations"); // Ir a "Mis Reservas"
 }
 
-// Función de botón de atrás
 function goBack() {
   router.push("/caretakers");
+}
+
+// Función para obtener el nombre del tipo de servicio
+function getServiceTypeName(typeId) {
+  const type = servicesStore.serviceTypes.find(t => t.id === typeId);
+  return type ? type.name : 'Servicio';
 }
 </script>
 
 <template>
-  <div class="container mt-4" v-if="caretaker">
-    <h2>{{ caretaker.name }}</h2>
+  <div v-if="loading" class="text-center py-5">
+    <div class="spinner-border"></div>
+    <p>Cargando datos del cuidador...</p>
+  </div>
 
-        <div class="d-flex justify-content-start mt-3">
-    <img :src="caretaker.photo" alt="foto" class="rounded-circle mb-3" width="100" height="100" />
-    <p>{{ caretaker.description }}</p>
+  <div v-else-if="error" class="alert alert-danger">
+    {{ error }}
+    <button class="btn btn-link" @click="goBack">Volver</button>
+  </div>
+  
+  <div class="container mt-4" v-else-if="carerProfile">
+    <h2>{{ carerProfile.name }} {{ carerProfile.lastName }}</h2>
+
+    <div class="d-flex justify-content-start align-items-center mt-3 gap-3">
+      <img :src="carerProfile.profilePhoto || 'https://i.pravatar.cc/150?u=' + carerProfile.email" alt="foto" class="rounded-circle mb-3" width="100" height="100" />
+      <p>{{ carerProfile.description || 'Cuidador apasionado por las mascotas.' }}</p>
     </div>
 
     <h5>Selecciona los servicios:</h5>
     <form @submit.prevent="bookCaretaker">
-      <div class="form-check mb-2" v-for="service in caretaker.services" :key="service.name">
-        <input
-          class="form-check-input"
-          type="checkbox"
-          :id="service.name"
-          :value="service.name"
-          v-model="selectedServices"
-        />
-        <label class="form-check-label" :for="service.name">
-          {{ service.name }} - ${{ service.price }}
-        </label>
+      
+      <div v-if="carerServices.length > 0">
+        <div class="form-check mb-2" v-for="service in carerServices" :key="service.id">
+          <input
+            class="form-check-input"
+            type="checkbox"
+            :id="'service-' + service.id"
+            :value="service.id" v-model="selectedServices"
+          />
+          <label class="form-check-label" :for="'service-' + service.id">
+            <strong>{{ getServiceTypeName(service.serviceTypeId) }}</strong> - 
+            <span>{{ service.description || 'Servicio estándar' }}</span> - 
+            <span class="text-success fw-bold">Gs. {{ service.price.toLocaleString('es-PY') }}</span>
+          </label>
+        </div>
       </div>
-
+      <div v-else class="alert alert-info">
+        Este cuidador no tiene servicios activos en este momento.
+      </div>
+      
       <div class="mb-3 mt-3">
         <label class="form-label fw-bold">Fecha de reserva</label>
         <input type="date" v-model="reservationDate" class="form-control" />
@@ -116,19 +155,20 @@ function goBack() {
 
       <div class="mb-3">
         <label class="form-label fw-bold">Nota adicional</label>
-        <textarea v-model="note" class="form-control" rows="3" placeholder="Ej. Preferencias del cuidado"></textarea>
+        <textarea v-model="note" class="form-control" rows="3" placeholder="Ej. Mi perro es tímido con otros perros."></textarea>
       </div>
 
-      <p class="fw-bold">Total: ${{ totalPrice }}</p>
-    <div class="d-flex justify-content-end mt-3">
-        <button class="btn btn-secondary me-2" @click="goBack">Atras</button>
-        <button type="submit" class="btn btn-success">Confirmar Reserva</button>
-    </div>
+      <p class="fw-bold fs-5">Total: Gs. {{ totalPrice.toLocaleString('es-PY') }}</p>
 
+      <div class="d-flex justify-content-end mt-3">
+        <button type="button" class="btn btn-secondary me-2" @click="goBack">Atras</button>
+        <button type_="submit" class="btn btn-success" :disabled="carerServices.length === 0">Confirmar Reserva</button>
+      </div>
     </form>
   </div>
 
-  <div v-else>
-    <p>Cuidador no encontrado.</p>
+  <div v-else class="alert alert-warning">
+    Cuidador no encontrado.
+    <button class="btn btn-link" @click="goBack">Volver</button>
   </div>
 </template>

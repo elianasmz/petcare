@@ -1,8 +1,7 @@
-// src/stores/userStore.js
 import { defineStore } from 'pinia'
 import UserApi from '../api/UserApi.js'
 
-export const useUserStore = defineStore('users', {
+export const useUsersStore = defineStore('users', {
     state: () => ({
         users: [],
         roles: [],
