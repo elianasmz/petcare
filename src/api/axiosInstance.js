@@ -5,7 +5,8 @@ import axios from 'axios'
 const API_BASES = {
     reservation: 'http://localhost:8081/api/v1',
     payment: 'http://localhost:8082/api/v1',
-    service: 'http://localhost:8083/api/v1'
+    service: 'http://localhost:8083/api/v1',
+    user: 'http://localhost:8084/api/v1'
 }
 
 // 🧠 Función para obtener un cliente Axios configurado

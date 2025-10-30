@@ -8,7 +8,7 @@ export const useServicesStore = defineStore('services', {
     currentService: null,
     loading: false,
     error: null,
-    
+
     // Metadata de paginación
     pagination: {
       totalElements: 0,
@@ -38,14 +38,14 @@ export const useServicesStore = defineStore('services', {
 
   actions: {
     // ==================== SERVICE TYPES ====================
-    
+
     async fetchServiceTypes(params = {}) {
       this.loading = true
       this.error = null
       try {
         const { data } = await ServiceApi.getServiceTypes(params)
         this.serviceTypes = data.content || data
-        
+
         if (data.totalElements !== undefined) {
           this.pagination = {
             totalElements: data.totalElements,
@@ -168,13 +168,17 @@ export const useServicesStore = defineStore('services', {
       }
     },
 
-    async fetchServicesByCarerId(carerId, params = {}) {
+    /**
+    * Acción para buscar servicios por texto
+    * @param {object} params
+    */
+    async searchServices(params = {}) {
       this.loading = true
       this.error = null
       try {
-        const { data } = await ServiceApi.getServicesByCarerId(carerId, params)
-        this.services = data.content || data
+        const { data } = await ServiceApi.searchServices(params)
 
+        this.services = data.content || []
         if (data.totalElements !== undefined) {
           this.pagination = {
             totalElements: data.totalElements,
@@ -184,77 +188,7 @@ export const useServicesStore = defineStore('services', {
           }
         }
       } catch (err) {
-        this.error = err.response?.data?.message || err.message || 'Error cargando servicios del cuidador'
-        console.error('Error en fetchServicesByCarerId:', err)
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async fetchServicesByType(serviceTypeId, params = {}) {
-      this.loading = true
-      this.error = null
-      try {
-        const { data } = await ServiceApi.getServicesByServiceTypeId(serviceTypeId, params)
-        this.services = data.content || data
-
-        if (data.totalElements !== undefined) {
-          this.pagination = {
-            totalElements: data.totalElements,
-            totalPages: data.totalPages,
-            size: data.size,
-            number: data.number
-          }
-        }
-      } catch (err) {
-        this.error = err.response?.data?.message || err.message || 'Error cargando servicios por tipo'
-        console.error('Error en fetchServicesByType:', err)
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async fetchServicesByPriceRange(minPrice, maxPrice, params = {}) {
-      this.loading = true
-      this.error = null
-      try {
-        const { data } = await ServiceApi.getServicesByPriceRange(minPrice, maxPrice, params)
-        this.services = data.content || data
-
-        if (data.totalElements !== undefined) {
-          this.pagination = {
-            totalElements: data.totalElements,
-            totalPages: data.totalPages,
-            size: data.size,
-            number: data.number
-          }
-        }
-      } catch (err) {
-        this.error = err.response?.data?.message || err.message || 'Error cargando servicios por rango de precio'
-        console.error('Error en fetchServicesByPriceRange:', err)
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async fetchServicesByCarerAndType(carerId, serviceTypeId, params = {}) {
-      this.loading = true
-      this.error = null
-      try {
-        const { data } = await ServiceApi.getServicesByCarerAndType(carerId, serviceTypeId, params)
-        this.services = data.content || data
-
-        if (data.totalElements !== undefined) {
-          this.pagination = {
-            totalElements: data.totalElements,
-            totalPages: data.totalPages,
-            size: data.size,
-            number: data.number
-          }
-        }
-      } catch (err) {
-        this.error = err.response?.data?.message || err.message || 'Error cargando servicios por cuidador y tipo'
-        console.error('Error en fetchServicesByCarerAndType:', err)
+        this.error = err.response?.data?.message || err.message
       } finally {
         this.loading = false
       }
@@ -310,62 +244,6 @@ export const useServicesStore = defineStore('services', {
       } catch (err) {
         this.error = err.response?.data?.message || err.message || 'Error eliminando servicio'
         console.error('Error en deleteService:', err)
-        throw err
-      } finally {
-        this.loading = false
-      }
-    },
-
-    // ==================== CARER WITH SERVICES ====================
-
-    /**
-     * Obtener cuidador con todos sus servicios (cabecera-detalle)
-     */
-    async fetchCarerWithServices(carerId) {
-      this.loading = true
-      this.error = null
-      try {
-        const { data } = await ServiceApi.getCarerWithServices(carerId)
-        return data
-      } catch (err) {
-        this.error = err.response?.data?.message || err.message || 'Error obteniendo cuidador con servicios'
-        console.error('Error en fetchCarerWithServices:', err)
-        throw err
-      } finally {
-        this.loading = false
-      }
-    },
-
-    /**
-     * Crear cuidador con servicios (cabecera-detalle)
-     */
-    async createCarerWithServices(carerData) {
-      this.loading = true
-      this.error = null
-      try {
-        const { data } = await ServiceApi.createCarerWithServices(carerData)
-        return data
-      } catch (err) {
-        this.error = err.response?.data?.message || err.message || 'Error creando cuidador con servicios'
-        console.error('Error en createCarerWithServices:', err)
-        throw err
-      } finally {
-        this.loading = false
-      }
-    },
-
-    /**
-     * Actualizar cuidador con servicios (cabecera-detalle)
-     */
-    async updateCarerWithServices(carerId, carerData) {
-      this.loading = true
-      this.error = null
-      try {
-        const { data } = await ServiceApi.updateCarerWithServices(carerId, carerData)
-        return data
-      } catch (err) {
-        this.error = err.response?.data?.message || err.message || 'Error actualizando cuidador con servicios'
-        console.error('Error en updateCarerWithServices:', err)
         throw err
       } finally {
         this.loading = false
