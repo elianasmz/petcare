@@ -4,6 +4,10 @@ import { useRouter } from "vue-router";
 // 1. Importar los stores reales
 import { useUsersStore } from "../stores/usersStore.js";
 import { useServicesStore } from "../stores/servicesStore.js";
+import { useReservationsStore } from "../stores/reservationsStore.js";
+
+const reservationsStore = useReservationsStore();
+
 // (No necesitas useRoute si usas props)
 
 // 2. Definir 'props' para recibir el ID del router
@@ -68,7 +72,7 @@ const totalPrice = computed(() => {
 });
 
 // 7. Función para confirmar reserva (simulada por ahora)
-function bookCaretaker() {
+async function bookCaretaker() {
   if (selectedServices.value.length === 0) {
     alert("Debes seleccionar al menos un servicio.");
     return;
@@ -77,24 +81,42 @@ function bookCaretaker() {
     alert("Debes seleccionar una fecha.");
     return;
   }
+    
+  const date = new Date(reservationDate.value + "T10:00:00-03:00");
+  const serviceDateUTC = date.toISOString(); // Ej: "2025-11-13T13:00:00.000Z"
 
-  // Esto es lo que se enviará al 'reservation-microservice'
+
+  // Datos de la reservación
   const reservationData = {
     carerId: Number(props.id),
-    ownerId: 1, // TODO: Obtener el ID del usuario logueado (dueño)
-    serviceIds: selectedServices.value,
-    reservationDate: reservationDate.value,
+    ownerId: 1, // Reemplaza con el ID del usuario logueado
+    serviceDate: serviceDateUTC,
     note: note.value,
     totalPrice: totalPrice.value
   };
 
-  console.log("Datos de la reserva:", reservationData);
-  alert(`Reserva simulada creada. Total: Gs. ${totalPrice.value.toLocaleString('es-PY')}`);
-  
-  // TODO: Llamar a reservationStore.createReservation(reservationData)
-  
-  router.push("/reservations"); // Ir a "Mis Reservas"
+  try {
+    // 1️⃣ Crear la reservación principal
+    const res = await reservationsStore.postReservation(reservationData);
+    const reservationId = res?.content?.id;
+    if (!reservationId) throw new Error("No se pudo obtener el ID de la reservación.");
+
+    // 2️⃣ Crear las relaciones ReservationService
+    for (const serviceId of selectedServices.value) {
+      await reservationsStore.postReservationService({
+        reservationId,
+        serviceId
+      });
+    }
+
+    alert(`Reserva creada correctamente. Total: Gs. ${totalPrice.value.toLocaleString('es-PY')}`);
+    router.push("/reservations"); // Ir a "Mis Reservas"
+  } catch (err) {
+    console.error("Error al crear la reserva:", err);
+    alert("Hubo un error al crear la reserva. Revisa la consola.");
+  }
 }
+
 
 function goBack() {
   router.push("/caretakers");

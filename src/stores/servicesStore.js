@@ -125,7 +125,26 @@ export const useServicesStore = defineStore('services', {
       } finally {
         this.loading = false
       }
+    }, 
+    async fetchServicesByCarer(carerId) {
+      this.loading = true
+      this.error = null
+
+      try {
+        const { data } = await ServiceApi.getServicesByCarer(carerId)
+
+        // response.content viene del backend con paginación
+        return data.content || []
+      } catch (err) {
+        this.error = err.response?.data?.message || err.message
+        console.error("Error en fetchServicesByCarer:", err)
+        return []
+      } finally {
+        this.loading = false
+      }
     },
+
+
 
     // ==================== SERVICES ====================
 

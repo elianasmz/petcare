@@ -1,12 +1,12 @@
 // src/api/HTTPClient.js
-import { getAxiosInstance } from './axiosInstance.js'
+import { axiosInstance } from './axiosInstance.js'
 
 class HTTPClient {
     constructor() {
         // Podés tener varios clientes según tu arquitectura
-        this.reservationApi = getAxiosInstance('reservation')
-        this.serviceApi = getAxiosInstance('service')
-        this.paymentApi = getAxiosInstance('payment')
+        this.reservationApi = axiosInstance
+        this.serviceApi = axiosInstance
+        this.paymentApi = axiosInstance
     }
 
     // ======================

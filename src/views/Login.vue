@@ -1,8 +1,10 @@
 <script setup>
 import { ref, reactive } from "vue";
 import { useRouter } from "vue-router";
+import { useUserStore } from "../stores/userStore.js";
 
 const router = useRouter();
+const userStore = useUserStore();
 const mode = ref("login"); // login | register
 
 // Login
@@ -16,24 +18,108 @@ const registerForm = reactive({
   email: "",
   password: "",
   confirmPassword: "",
-  userType: "", // "dueno" | "cuidador" | "ambos"
   name: "",
-  phone: "",
-  experience: "",
-  pets: "",
+  lastName: "",
+  phoneNumber: "",
+  userType: "", // "dueno" | "cuidador" | "ambos"
+  state: "AVAILABLE", // Estado de disponibilidad por defecto
 });
 
+const loginError = ref("");
+const registerError = ref("");
 
-function handleLogin() {
-  // Lógica real iría aquí
-  alert(`Bienvenido, ${loginForm.email}`);
-  router.push("/");
+// Mapeo por defecto de tipos de usuario a IDs de roles
+// Estos IDs son comunes, pero pueden necesitar ajuste según tu base de datos
+// OWNER generalmente es 1, CARER generalmente es 2
+// NOTA: No podemos cargar roles desde el backend durante el registro porque
+// el endpoint /roles requiere rol de ADMIN. Por lo tanto, usamos IDs estáticos.
+const DEFAULT_ROLE_IDS = {
+  'dueno': [1],      // OWNER - Ajusta este ID si es diferente en tu BD
+  'cuidador': [2],   // CARER - Ajusta este ID si es diferente en tu BD
+  'ambos': [1, 2]    // OWNER y CARER
+};
+
+async function handleLogin() {
+  loginError.value = "";
+  
+  if (!loginForm.email || !loginForm.password) {
+    loginError.value = "Por favor completa todos los campos";
+    return;
+  }
+
+  try {
+    await userStore.login(loginForm.email, loginForm.password);
+    
+    // Redirigir según el rol del usuario
+    if (userStore.isCarer) {
+      router.push("/carer");
+    } else if (userStore.isOwner) {
+      router.push("/");
+    } else {
+      router.push("/");
+    }
+  } catch (err) {
+    loginError.value = userStore.error || "Error al iniciar sesión. Verifica tus credenciales.";
+  }
 }
 
-function handleRegister() {
-  // Validaciones extra aquí
-  alert(`Registrado como: ${registerForm.userType.join(", ")}`);
-  router.push("/");
+async function handleRegister() {
+  registerError.value = "";
+  
+  // Validaciones
+  if (!registerForm.email || !registerForm.password || !registerForm.name || !registerForm.phoneNumber) {
+    registerError.value = "Por favor completa todos los campos obligatorios";
+    return;
+  }
+
+  if (registerForm.password !== registerForm.confirmPassword) {
+    registerError.value = "Las contraseñas no coinciden";
+    return;
+  }
+
+  if (registerForm.password.length < 6) {
+    registerError.value = "La contraseña debe tener al menos 6 caracteres";
+    return;
+  }
+
+  if (!registerForm.userType) {
+    registerError.value = "Por favor selecciona un tipo de usuario";
+    return;
+  }
+
+  // Mapear tipo de usuario a IDs de roles
+  // Usar el mapeo por defecto ya que no podemos cargar roles sin autenticación ADMIN
+  const roleIds = DEFAULT_ROLE_IDS[registerForm.userType];
+  
+  if (!roleIds || roleIds.length === 0) {
+    registerError.value = "Tipo de usuario inválido. Por favor selecciona un tipo válido.";
+    return;
+  }
+
+  const registerData = {
+    email: registerForm.email,
+    name: registerForm.name,
+    lastName: registerForm.lastName || "",
+    password: registerForm.password,
+    phoneNumber: registerForm.phoneNumber,
+    state: registerForm.state,
+    roles: roleIds
+  };
+
+  try {
+    await userStore.register(registerData);
+    
+    // Redirigir según el rol del usuario
+    if (userStore.isCarer) {
+      router.push("/carer");
+    } else if (userStore.isOwner) {
+      router.push("/");
+    } else {
+      router.push("/");
+    }
+  } catch (err) {
+    registerError.value = userStore.error || "Error al registrar usuario. Intenta nuevamente.";
+  }
 }
 </script>
 
@@ -58,16 +144,25 @@ function handleRegister() {
 
       <!-- LOGIN -->
       <form v-if="mode === 'login'" @submit.prevent="handleLogin" class="form">
+        <div v-if="loginError" class="alert alert-danger">
+          {{ loginError }}
+        </div>
         <input type="email" v-model="loginForm.email" placeholder="Correo electrónico" required />
         <input type="password" v-model="loginForm.password" placeholder="Contraseña" required />
-        <button type="submit" class="btn-primary">Ingresar</button>
+        <button type="submit" class="btn-primary" :disabled="userStore.loading">
+          {{ userStore.loading ? 'Iniciando sesión...' : 'Ingresar' }}
+        </button>
       </form>
 
       <!-- REGISTRO -->
       <form v-else @submit.prevent="handleRegister" class="form">
-        <input type="text" v-model="registerForm.name" placeholder="Nombre completo" required />
+        <div v-if="registerError" class="alert alert-danger">
+          {{ registerError }}
+        </div>
+        <input type="text" v-model="registerForm.name" placeholder="Nombre" required />
+        <input type="text" v-model="registerForm.lastName" placeholder="Apellido" />
         <input type="email" v-model="registerForm.email" placeholder="Correo electrónico" required />
-        <input type="text" v-model="registerForm.phone" placeholder="Teléfono" required />
+        <input type="text" v-model="registerForm.phoneNumber" placeholder="Teléfono" required />
         <input type="password" v-model="registerForm.password" placeholder="Contraseña" required />
         <input type="password" v-model="registerForm.confirmPassword" placeholder="Confirmar contraseña" required />
 
@@ -91,7 +186,9 @@ function handleRegister() {
         </div>
         </div>
 
-        <button type="submit" class="btn-primary">Registrarse</button>
+        <button type="submit" class="btn-primary" :disabled="userStore.loading">
+          {{ userStore.loading ? 'Registrando...' : 'Registrarse' }}
+        </button>
 
       </form>
     </div>
@@ -153,6 +250,24 @@ function handleRegister() {
     .form input:focus,
     .form textarea:focus {
     border: 1px solid #2196f3;
+    }
+
+    .alert {
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    }
+
+    .alert-danger {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+    }
+
+    button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
     }
 
     .checkboxes {

@@ -1,15 +1,19 @@
 <script setup>
 import { onMounted, ref, reactive, computed } from "vue"
+import { useRouter } from "vue-router"
 import { useServicesStore } from "../stores/servicesStore.js"
-// 1. Importar el store de usuarios
 import { useUsersStore } from "../stores/usersStore.js"
+import { useUserStore } from "../stores/userStore.js"
 
+const router = useRouter()
 const servicesStore = useServicesStore()
-// 2. Usar el store de usuarios
 const usersStore = useUsersStore()
+const userStore = useUserStore()
 
-// 3. Obtener ID del usuario logueado (simulado, reemplaza esto con tu store de auth)
-const loggedInUserId = ref(5) 
+// Obtener ID del usuario autenticado (computado para reactividad)
+const loggedInUserId = computed(() => {
+  return userStore.user?.id || null
+}) 
 
 // Referencia al formulario de servicio
 const serviceFormRef = ref(null)
@@ -29,16 +33,54 @@ const isEditing = ref(false)
 
 // Cargar datos al montar
 onMounted(async () => {
+  // Verificar autenticación
+  if (!userStore.isAuthenticated) {
+    router.push('/login')
+    return
+  }
+
+  // Verificar que sea cuidador
+  if (!userStore.isCarer) {
+    router.push('/')
+    return
+  }
+
   loading.value = true
   try {
-    // 5. Cargar datos del perfil del usuario (cuidador)
-    await usersStore.fetchUserById(loggedInUserId.value)
+    // Si no tenemos el usuario completo, cargarlo
+    if (!userStore.user || !userStore.user.id) {
+      if (userStore.username) {
+        await usersStore.fetchUserByEmail(userStore.username)
+        // Actualizar el userStore con los datos completos
+        if (usersStore.currentUser) {
+          userStore.user = usersStore.currentUser
+        }
+      } else {
+        throw new Error('No se pudo obtener el email del usuario autenticado')
+      }
+    }
+
+    // Obtener el ID del usuario
+    const userId = userStore.user?.id
     
-    // 6. Cargar los tipos de servicio (para el dropdown)
+    if (!userId) {
+      console.error('Usuario cargado pero sin ID:', userStore.user)
+      throw new Error('No se pudo obtener el ID del usuario. El usuario no tiene ID asignado.')
+    }
+
+    // Cargar datos del perfil del usuario (cuidador)
+    await usersStore.fetchUserById(userId)
+    
+    // Actualizar userStore con los datos completos del usuario
+    if (usersStore.currentUser) {
+      userStore.user = usersStore.currentUser
+    }
+    
+    // Cargar los tipos de servicio (para el dropdown)
     await servicesStore.fetchServiceTypes()
     
-    // 7. Cargar los servicios de ESTE cuidador
-    await servicesStore.fetchServices({ carerId: loggedInUserId.value, size: 100 })
+    // Cargar los servicios de ESTE cuidador
+    await servicesStore.fetchServices({ carerId: userId, size: 100 })
     
   } catch (err) {
     console.error('Error cargando datos del dashboard:', err)
@@ -76,9 +118,14 @@ async function handleSubmit() {
 
 async function addService() {
   if (!validateForm()) return
+  const userId = userStore.user?.id
+  if (!userId) {
+    alert("Error: No se pudo obtener el ID del usuario. Por favor, recarga la página.")
+    return
+  }
   try {
     await servicesStore.createService({
-      carerId: loggedInUserId.value,
+      carerId: userId,
       serviceTypeId: serviceForm.typeId,
       description: serviceForm.description || null,
       price: Number(serviceForm.price)
@@ -92,9 +139,14 @@ async function addService() {
 
 async function updateService() {
   if (!validateForm()) return
+  const userId = userStore.user?.id
+  if (!userId) {
+    alert("Error: No se pudo obtener el ID del usuario. Por favor, recarga la página.")
+    return
+  }
   try {
     await servicesStore.updateService(serviceForm.id, {
-      carerId: loggedInUserId.value,
+      carerId: userId,
       serviceTypeId: serviceForm.typeId,
       description: serviceForm.description || null,
       price: Number(serviceForm.price)

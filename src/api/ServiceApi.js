@@ -1,9 +1,9 @@
 // src/api/ServiceApi.js
-import { getAxiosInstance } from './axiosInstance.js'
+import { axiosInstance } from './axiosInstance.js'
 
 class ServiceApi {
     constructor() {
-        this.serviceApi = getAxiosInstance('service')
+        this.serviceApi = axiosInstance
 
         this.serviceApi.interceptors.response.use(
             response => response,
@@ -15,6 +15,7 @@ class ServiceApi {
     }
     
     // ==================== SERVICE TYPES ====================
+    // Rutas a través del gateway: /apirest-services/**
     
     getServiceTypes(params = {}) {
         return this.serviceApi.get('/service-types', { params })
@@ -37,6 +38,7 @@ class ServiceApi {
     }
 
     // ==================== SERVICES ====================
+    // Rutas a través del gateway: /apirest-services/**
     
     /**
      * Obtener servicios.
@@ -69,6 +71,17 @@ class ServiceApi {
     deleteService(id) {
         return this.serviceApi.delete(`/services/${id}`)
     }
+
+    /**
+     * Obtiene servicios de un cuidador
+     * GET /services?carerId={id}&page=0&size=100
+     */
+    getServicesByCarer(carerId, page = 0, size = 100) {
+    return this.serviceApi.get(`/services`, {
+        params: { carerId, page, size }
+    })
+}
+
 }
 
 export default new ServiceApi()

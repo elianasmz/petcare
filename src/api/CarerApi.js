@@ -1,9 +1,9 @@
-import { getAxiosInstance } from './axiosInstance.js'
+import { axiosInstance } from './axiosInstance.js'
 
 class CarerApi {
     constructor() {
         // Los carers están en el mismo microservicio que services (puerto 8083)
-        this.carerApi = getAxiosInstance('service')
+        this.carerApi = axiosInstance
 
         // Interceptor de respuesta para manejo global de errores
         this.carerApi.interceptors.response.use(
@@ -16,39 +16,41 @@ class CarerApi {
     }
     
     // ==================== CARERS ====================
+    // Rutas a través del gateway: /apirest-services/**
     
     /**
      * Obtener todos los cuidadores (sin servicios)
-     * GET /carers
+     * GET /apirest-services/carers
      */
     getCarers() {
-        return this.carerApi.get('/carers')
+        return this.carerApi.get('/users/carers/available')
     }
 
     // ==================== CARER WITH SERVICES ====================
+    // Rutas a través del gateway: /apirest-services/**
     
     /**
      * Crear cuidador con servicios (cabecera-detalle)
-     * POST /carers-with-services
+     * POST /apirest-services/carers-with-services
      */
     createCarerWithServices(data) {
-        return this.carerApi.post('/carers-with-services', data)
+        return this.carerApi.post('/apirest-services/carers-with-services', data)
     }
 
     /**
      * Obtener cuidador con servicios
-     * GET /carers-with-services/{carerId}
+     * GET /apirest-services/carers-with-services/{carerId}
      */
     getCarerWithServices(carerId) {
-        return this.carerApi.get(`/carers-with-services/${carerId}`)
+        return this.carerApi.get(`/apirest-services/carers-with-services/${carerId}`)
     }
 
     /**
      * Actualizar cuidador con servicios (cabecera-detalle)
-     * PUT /carers-with-services/{carerId}
+     * PUT /apirest-services/carers-with-services/{carerId}
      */
     updateCarerWithServices(carerId, data) {
-        return this.carerApi.put(`/carers-with-services/${carerId}`, data)
+        return this.carerApi.put(`/apirest-services/carers-with-services/${carerId}`, data)
     }
 }
 

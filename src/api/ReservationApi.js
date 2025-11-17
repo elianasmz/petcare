@@ -1,12 +1,13 @@
-import { getAxiosInstance } from './axiosInstance.js'
+import { axiosInstance } from './axiosInstance.js'
 
 class ReservationApi {
     constructor() {
-        this.reservationApi = getAxiosInstance('reservation')
+        this.reservationApi = axiosInstance
     }
 
     /**
      * RESERVATION
+     * Rutas a través del gateway: /reservations/** -> RESERVATION-MICROSERVICE (protegido)
      */
     /**
      * Obtener todas las reservaciones (paginadas)

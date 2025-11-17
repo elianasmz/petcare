@@ -1,8 +1,8 @@
-import { getAxiosInstance } from './axiosInstance.js'
+import { axiosInstance } from './axiosInstance.js'
 
 class UserApi {
     constructor() {
-        this.userApi = getAxiosInstance('user')
+        this.userApi = axiosInstance
 
         this.userApi.interceptors.response.use(
             response => response,
@@ -14,6 +14,8 @@ class UserApi {
     }
 
     // ==================== USERS ====================
+    // Rutas a través del gateway: /users/** -> USER-MICROSERVICE (protegido)
+    // El gateway maneja la autenticación y autorización
 
     /**
      * @param {object} params
@@ -85,6 +87,7 @@ class UserApi {
     }
 
     // ==================== ROLES (Catálogo) ====================
+    // Rutas a través del gateway: /roles/** -> USER-MICROSERVICE (protegido - solo admin)
 
     getRoles() {
         return this.userApi.get('/roles')
@@ -111,6 +114,7 @@ class UserApi {
     }
 
     // ==================== USER-ROLES ====================
+    // Rutas a través del gateway: /user-roles/** -> USER-MICROSERVICE (protegido)
 
     getAllUserRoles() {
         return this.userApi.get('/user-roles')

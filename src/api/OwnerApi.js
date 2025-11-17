@@ -1,9 +1,9 @@
-import { getAxiosInstance } from './axiosInstance.js'
+import { axiosInstance } from './axiosInstance.js'
 
 class OwnerApi {
     constructor() {
         // Los owners están en el microservicio de service (puerto 8083)
-        this.ownerApi = getAxiosInstance('service')
+        this.ownerApi = axiosInstance
 
         // Interceptor de respuesta para manejo global de errores
         this.ownerApi.interceptors.response.use(
@@ -16,21 +16,22 @@ class OwnerApi {
     }
 
     // ==================== OWNERS ====================
+    // Rutas a través del gateway: /apirest-services/**
 
     /**
      * Obtener todos los propietarios
-     * GET /owners
+     * GET /apirest-services/owners
      */
     getOwners() {
-        return this.ownerApi.get('/owners')
+        return this.ownerApi.get('/apirest-services/owners')
     }
 
     /**
      * Obtener un propietario por ID
-     * GET /owners/{id}
+     * GET /apirest-services/owners/{id}
      */
     getOwnerById(ownerId) {
-        return this.ownerApi.get(`/owners/${ownerId}`)
+        return this.ownerApi.get(`/apirest-services/owners/${ownerId}`)
     }
 }
 

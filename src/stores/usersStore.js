@@ -61,6 +61,17 @@ export const useUsersStore = defineStore('users', {
             this.error = null
             try {
                 const { data } = await UserApi.getUserByEmail(email)
+                // Asignar el usuario actual
+                this.currentUser = data
+                // Cargar roles si el usuario tiene ID
+                if (data && data.id) {
+                    try {
+                        await this.fetchUserRoles(data.id);
+                    } catch (roleErr) {
+                        console.warn('No se pudieron cargar los roles del usuario:', roleErr)
+                        // No fallar si no se pueden cargar los roles
+                    }
+                }
                 return data
             } catch (err) {
                 this.error = err.response?.data?.message || err.message
@@ -116,6 +127,7 @@ export const useUsersStore = defineStore('users', {
             } catch (err) { this.error = err.response?.data?.message || err.message; throw err }
             finally { this.loading = false }
         },
+        
 
         // ==================== USER ROLES ====================
 
@@ -186,6 +198,7 @@ export const useUsersStore = defineStore('users', {
         // ==================== ROLES (Catálogo) ====================
 
         async fetchRoles() {
+            // No cargar roles si ya están cargados
             if (this.roles.length > 0) return; 
             
             this.loading = true; this.error = null;
@@ -193,7 +206,16 @@ export const useUsersStore = defineStore('users', {
                 const { data } = await UserApi.getRoles(); 
                 this.roles = data || []; 
             }
-            catch (err) { this.error = err.response?.data?.message || err.message }
+            catch (err) {
+                // Si es 401 (no autorizado), significa que el usuario no es ADMIN
+                // Esto es normal y no debe considerarse un error crítico
+                if (err.response?.status === 401) {
+                    console.warn('No se pueden cargar roles: se requiere rol de ADMIN. Esto es normal para usuarios no administradores.');
+                    this.error = null; // No establecer error para 401
+                } else {
+                    this.error = err.response?.data?.message || err.message;
+                }
+            }
             finally { this.loading = false }
         },
         async createRole(roleData) {
