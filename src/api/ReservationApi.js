@@ -23,9 +23,30 @@ class ReservationApi {
      * @param data {ownerId, carerId, serviceDate, reservationState}
      * @returns {Promise<axios.AxiosResponse<any>>}
      */
-    postReservation(data) {
+    /*postReservation(data) {
         return this.reservationApi.post('/reservations', data)
-    }
+    }*/
+   async postReservation(data) {
+  try {
+    const response = await this.reservationApi.post('/reservations', data);
+    console.log("Respuesta backend:", response.data); // 👀 confirma qué llega
+    return response.data; // ✅ devuelve el objeto plano con id
+  } catch (error) {
+    console.error("[ReservationStore] Error al crear reservación:", error.response?.data || error);
+    throw error;
+  }
+}
+
+async postReservationService(data) {
+  try {
+    const response = await this.reservationApi.post('/reservation-services', data);
+    console.log("Respuesta backend Reservation-Service:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("[ReservationStore] Error al crear relación Reservation-Service:", error.response?.data || error);
+    throw error;
+  }
+} 
 
     /**
      * Obtener una reservación por ID
@@ -122,6 +143,19 @@ class ReservationApi {
     getServicesByReservation(reservationId) {
         return this.reservationApi.get(`/reservation-services/by-reservation/${reservationId}`)
     }
+    
+    async getReservationServicesByReservationId(reservationId) {
+        try {
+            const res = await this.reservationApi.get(`/reservation-services/by-reservation/${reservationId}`);
+            // El backend devuelve una lista directamente, no un objeto con items
+            return res.data || [];
+        } catch (error) {
+            console.error("Error al cargar servicios de la reserva:", error);
+            throw error;
+        }
+    }
+
+
 
     /**
      * Eliminar relaciones por ID de reservación

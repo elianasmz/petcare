@@ -1,25 +1,25 @@
 <script setup>
 import { onMounted, ref, reactive, computed } from "vue"
 import { useRouter } from "vue-router"
-import { useServicesStore } from "../stores/servicesStore.js"
-import { useUsersStore } from "../stores/usersStore.js"
-import { useUserStore } from "../stores/userStore.js"
+import { useServices } from "../composables/useServices.js"
+import { useUsers } from "../composables/useUsers.js"
+import { useAuth } from "../composables/useAuth.js"
 
 const router = useRouter()
-const servicesStore = useServicesStore()
-const usersStore = useUsersStore()
-const userStore = useUserStore()
+const services = useServices()
+const users = useUsers()
+const auth = useAuth()
 
 // Obtener ID del usuario autenticado (computado para reactividad)
 const loggedInUserId = computed(() => {
-  return userStore.user?.id || null
+  return auth.user.value?.id || null
 }) 
 
 // Referencia al formulario de servicio
 const serviceFormRef = ref(null)
 
-// 4. Usar 'currentUser' del userStore como base para el perfil
-const carerProfile = computed(() => usersStore.currentUser)
+// 4. Usar 'currentUser' del composable como base para el perfil
+const carerProfile = computed(() => users.currentUser.value)
 const loading = ref(false)
 
 // Formulario de servicio (crear/editar)
@@ -34,13 +34,13 @@ const isEditing = ref(false)
 // Cargar datos al montar
 onMounted(async () => {
   // Verificar autenticación
-  if (!userStore.isAuthenticated) {
+  if (!auth.isAuthenticated.value) {
     router.push('/login')
     return
   }
 
   // Verificar que sea cuidador
-  if (!userStore.isCarer) {
+  if (!auth.isCarer.value) {
     router.push('/')
     return
   }
@@ -48,12 +48,12 @@ onMounted(async () => {
   loading.value = true
   try {
     // Si no tenemos el usuario completo, cargarlo
-    if (!userStore.user || !userStore.user.id) {
-      if (userStore.username) {
-        await usersStore.fetchUserByEmail(userStore.username)
-        // Actualizar el userStore con los datos completos
-        if (usersStore.currentUser) {
-          userStore.user = usersStore.currentUser
+    if (!auth.user.value || !auth.user.value.id) {
+      if (auth.username.value) {
+        await users.fetchUserByEmail(auth.username.value)
+        // Actualizar el composable con los datos completos
+        if (users.currentUser.value) {
+          auth.user.value = users.currentUser.value
         }
       } else {
         throw new Error('No se pudo obtener el email del usuario autenticado')
@@ -61,30 +61,30 @@ onMounted(async () => {
     }
 
     // Obtener el ID del usuario
-    const userId = userStore.user?.id
+    const userId = auth.user.value?.id
     
     if (!userId) {
-      console.error('Usuario cargado pero sin ID:', userStore.user)
+      console.error('Usuario cargado pero sin ID:', auth.user.value)
       throw new Error('No se pudo obtener el ID del usuario. El usuario no tiene ID asignado.')
     }
 
     // Cargar datos del perfil del usuario (cuidador)
-    await usersStore.fetchUserById(userId)
+    await users.fetchUserById(userId)
     
-    // Actualizar userStore con los datos completos del usuario
-    if (usersStore.currentUser) {
-      userStore.user = usersStore.currentUser
+    // Actualizar composable con los datos completos del usuario
+    if (users.currentUser.value) {
+      auth.user.value = users.currentUser.value
     }
     
     // Cargar los tipos de servicio (para el dropdown)
-    await servicesStore.fetchServiceTypes()
+    await services.fetchServiceTypes()
     
     // Cargar los servicios de ESTE cuidador
-    await servicesStore.fetchServices({ carerId: userId, size: 100 })
+    await services.fetchServices({ carerId: userId, size: 100 })
     
   } catch (err) {
     console.error('Error cargando datos del dashboard:', err)
-    servicesStore.error = "Error al cargar los datos del panel."
+    services.error.value = "Error al cargar los datos del panel."
   } finally {
     loading.value = false
   }
@@ -93,7 +93,7 @@ onMounted(async () => {
 // --- Funciones de UI (Computadas) ---
 
 function getServiceTypeName(typeId) {
-  const type = servicesStore.serviceTypes.find(t => t.id === typeId)
+  const type = services.serviceTypes.value.find(t => t.id === typeId)
   return type ? type.name : `Tipo ${typeId}`
 }
 
@@ -118,43 +118,47 @@ async function handleSubmit() {
 
 async function addService() {
   if (!validateForm()) return
-  const userId = userStore.user?.id
+  const userId = auth.user.value?.id
   if (!userId) {
     alert("Error: No se pudo obtener el ID del usuario. Por favor, recarga la página.")
     return
   }
   try {
-    await servicesStore.createService({
+    await services.createService({
       carerId: userId,
       serviceTypeId: serviceForm.typeId,
       description: serviceForm.description || null,
       price: Number(serviceForm.price)
     })
+    // Recargar servicios
+    await services.fetchServices({ carerId: userId, size: 100 })
     resetForm()
     alert("Servicio creado exitosamente")
   } catch (err) {
-    alert("Error: " + (servicesStore.error || err.message))
+    alert("Error: " + (services.error.value || err.message))
   }
 }
 
 async function updateService() {
   if (!validateForm()) return
-  const userId = userStore.user?.id
+  const userId = auth.user.value?.id
   if (!userId) {
     alert("Error: No se pudo obtener el ID del usuario. Por favor, recarga la página.")
     return
   }
   try {
-    await servicesStore.updateService(serviceForm.id, {
+    await services.updateService(serviceForm.id, {
       carerId: userId,
       serviceTypeId: serviceForm.typeId,
       description: serviceForm.description || null,
       price: Number(serviceForm.price)
     })
+    // Recargar servicios
+    await services.fetchServices({ carerId: userId, size: 100 })
     resetForm()
     alert("Servicio actualizado exitosamente")
   } catch (err) {
-    alert("Error: " + (servicesStore.error || err.message))
+    alert("Error: " + (services.error.value || err.message))
   }
 }
 
@@ -174,10 +178,10 @@ async function deleteService(service) {
     return
   }
   try {
-    await servicesStore.deleteService(service.id)
+    await services.deleteService(service.id)
     alert("Servicio eliminado exitosamente")
   } catch (err) {
-    alert("Error: " + (servicesStore.error || err.message))
+    alert("Error: " + (services.error.value || err.message))
   }
 }
 
@@ -207,9 +211,9 @@ const fileInput = ref(null)
 function triggerFileInput() { fileInput.value.click() }
 function handleFileChange(event) {
   const file = event.target.files[0]
-  if (file && usersStore.currentUser) {
-    usersStore.currentUser.profilePhoto = URL.createObjectURL(file)
-    // Aquí llamarías a userStore.updateUser(...) para subir la foto
+  if (file && users.currentUser.value) {
+    users.currentUser.value.profilePhoto = URL.createObjectURL(file)
+    // Aquí llamarías a users.updateUser(...) para subir la foto
   }
 }
 
@@ -224,9 +228,9 @@ function saveProfile() {
   <div class="container mt-4">
     <h2>Panel de Cuidador</h2>
 
-    <div v-if="servicesStore.error" class="alert alert-danger alert-dismissible fade show">
-      {{ servicesStore.error }}
-      <button type="button" class="btn-close" @click="servicesStore.clearError()"></button>
+    <div v-if="services.error.value" class="alert alert-danger alert-dismissible fade show">
+      {{ services.error.value }}
+      <button type="button" class="btn-close" @click="services.clearError()"></button>
     </div>
 
     <div v-if="loading" class="text-center py-5">
@@ -284,7 +288,7 @@ function saveProfile() {
               <label class="form-label">Tipo de servicio</label>
               <select v-model.number="serviceForm.typeId" class="form-select" required>
                 <option :value="null" disabled>Selecciona tipo</option>
-                <option v-for="type in servicesStore.serviceTypes" :key="type.id" :value="type.id">
+                <option v-for="type in services.serviceTypes.value" :key="type.id" :value="type.id">
                   {{ type.name }}
                 </option>
               </select>
@@ -298,21 +302,21 @@ function saveProfile() {
               <input type="text" v-model="serviceForm.description" class="form-control" placeholder="Ej. Incluye paseo de 30 minutos" />
             </div>
             <div class="col-12">
-              <button v-if="!isEditing" type="submit" class="btn btn-primary" :disabled="servicesStore.loading">
-                {{ servicesStore.loading ? 'Guardando...' : 'Agregar Servicio' }}
+              <button v-if="!isEditing" type="submit" class="btn btn-primary" :disabled="services.loading.value">
+                {{ services.loading.value ? 'Guardando...' : 'Agregar Servicio' }}
               </button>
-              <button v-else type="submit" class="btn btn-warning" :disabled="servicesStore.loading">
-                {{ servicesStore.loading ? 'Actualizando...' : 'Guardar Cambios' }}
+              <button v-else type="submit" class="btn btn-warning" :disabled="services.loading.value">
+                {{ services.loading.value ? 'Actualizando...' : 'Guardar Cambios' }}
               </button>
             </div>
           </div>
         </form>
 
-        <div v-if="servicesStore.loading" class="text-center text-muted py-3">
+        <div v-if="services.loading.value" class="text-center text-muted py-3">
           <div class="spinner-border spinner-border-sm me-2"></div>
           Cargando servicios...
         </div>
-        <div v-else-if="servicesStore.services.length > 0" class="table-responsive">
+        <div v-else-if="services.services.value.length > 0" class="table-responsive">
           <table class="table table-hover">
             <thead class="table-light">
               <tr>
@@ -324,7 +328,7 @@ function saveProfile() {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="service in servicesStore.services" :key="service.id">
+              <tr v-for="service in services.services.value" :key="service.id">
                 <td>{{ getServiceTypeName(service.serviceTypeId) }}</td>
                 <td>{{ service.description || '-' }}</td>
                 <td class="text-success fw-bold">Gs. {{ service.price.toLocaleString('es-PY') }}</td>
@@ -333,10 +337,10 @@ function saveProfile() {
                   <span v-else class="badge bg-secondary">Inactivo</span>
                 </td>
                 <td>
-                  <button class="btn btn-sm btn-outline-primary me-2" @click="editService(service)" :disabled="servicesStore.loading">
+                  <button class="btn btn-sm btn-outline-primary me-2" @click="editService(service)" :disabled="services.loading.value">
                     Editar
                   </button>
-                  <button class="btn btn-sm btn-outline-secondary" @click="deleteService(service)" :disabled="servicesStore.loading">
+                  <button class="btn btn-sm btn-outline-secondary" @click="deleteService(service)" :disabled="services.loading.value">
                     Eliminar
                   </button>
                 </td>

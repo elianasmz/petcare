@@ -1,10 +1,17 @@
 <script setup>
 import {ref, computed, onMounted} from "vue";
 import {useRouter} from "vue-router";
-import {useReservationsStore} from "../stores/reservationsStore.js";
+import {useReservations} from "../composables/useReservations.js";
+import {useAuth} from "../composables/useAuth.js";
+import {useUsers} from "../composables/useUsers.js";
+import {useOwners} from "../composables/useOwners.js";
+import {getUserIdFromToken} from "../utils/jwtUtils.js";
 
 const router = useRouter();
-const reservationStore = useReservationsStore();
+const reservations = useReservations();
+const auth = useAuth();
+const users = useUsers();
+const owners = useOwners();
 
 // Estados legibles
 const estados = ["Todas", "Pendiente", "Aceptada", "Rechazada", "Finalizada"];
@@ -14,14 +21,89 @@ const filtroEstado = ref("Todas");
 const paginaActual = ref(1);
 const porPagina = ref(2);
 
+// Obtener ownerId del usuario en sesión
+async function getOwnerIdFromSession() {
+  try {
+    // Primero intentar obtener el ID del usuario desde el composable
+    let userId = auth.user.value?.id;
+    
+    // Si no tenemos el usuario completo, intentar cargarlo
+    if (!userId) {
+      if (auth.username.value) {
+        try {
+          await users.fetchUserByEmail(auth.username.value);
+          if (users.currentUser.value) {
+            auth.user.value = users.currentUser.value;
+            userId = auth.user.value?.id;
+          }
+        } catch (err) {
+          // Si falla obtener el usuario (503, etc.), no loguear si es 503
+          if (err.response?.status !== 503) {
+            console.warn("No se pudo cargar usuario completo:", err);
+          }
+        }
+      }
+    }
+    
+    // Si aún no tenemos userId, intentar extraerlo del token JWT
+    if (!userId && auth.token.value) {
+      const tokenUserId = getUserIdFromToken(auth.token.value);
+      if (tokenUserId) {
+        userId = tokenUserId;
+        // Guardar en el composable para futuras referencias
+        if (!auth.user.value) {
+          auth.user.value = { id: userId };
+        } else {
+          auth.user.value.id = userId;
+        }
+      }
+    }
+    
+    if (!userId) {
+      console.warn("No se pudo obtener el ID del usuario desde el composable ni del token");
+      return null;
+    }
+    
+    // En la mayoría de arquitecturas, ownerId = userId cuando el usuario tiene rol OWNER
+    // Intentar obtener el owner solo si es necesario, pero no fallar si no existe
+    try {
+      await owners.getOwnerById(userId);
+      const owner = owners.owners.value.find(o => o.id === userId || o.userId === userId);
+      if (owner && owner.id) {
+        return owner.id;
+      }
+    } catch (err) {
+      // Si el endpoint no existe o falla, usar userId directamente
+      // No loguear errores 404/503 ya que son esperados
+    }
+    
+    // Fallback: usar userId como ownerId (común cuando ownerId = userId)
+    return userId;
+  } catch (err) {
+    // Último fallback: intentar desde token o composable
+    return auth.user.value?.id || (auth.token.value ? getUserIdFromToken(auth.token.value) : null);
+  }
+}
+
 onMounted(async () => {
-  reservationStore.filter.ownerId = 1; // simula usuario logueado
-  await cargarReservas();
-  await reservationStore.getAllReservationServices();
+  // Obtener ownerId del usuario en sesión
+  const ownerId = await getOwnerIdFromSession();
+  if (ownerId) {
+    reservations.filter.value.ownerId = ownerId;
+    await cargarReservas();
+    
+    // 🔥 Cargar los servicios de cada reserva
+    for (const r of reservations.reservations.value) {
+      await reservations.getServicesByReservation(r.id);
+    }
+  } else {
+    console.error("No se pudo obtener el ownerId del usuario en sesión");
+  }
 });
 
+
 async function cargarReservas() {
-  await reservationStore.searchReservations({
+  await reservations.searchReservations({
     page: paginaActual.value - 1,
     size: porPagina.value,
   });
@@ -29,7 +111,7 @@ async function cargarReservas() {
 
 // 🔁 Cambiar página
 async function irAPagina(n) {
-  if (n >= 1 && n <= reservationStore.pageable.totalPages) {
+  if (n >= 1 && n <= reservations.pageable.value.totalPages) {
     paginaActual.value = n;
     await cargarReservas();
   }
@@ -43,7 +125,7 @@ async function paginaAnterior() {
 }
 
 async function paginaSiguiente() {
-  if (paginaActual.value < reservationStore.pageable.totalPages) {
+  if (paginaActual.value < reservations.pageable.value.totalPages) {
     paginaActual.value++;
     await cargarReservas();
   }
@@ -51,22 +133,22 @@ async function paginaSiguiente() {
 
 async function cambiarEstado(estado) {
   filtroEstado.value = estado;
-  reservationStore.filter.state = estado;
+  reservations.filter.value.state = estado;
   paginaActual.value = 1;
   await cargarReservas();
 }
 
 // 🧩 Filtrar reservas en memoria según estado
 const reservasFiltradas = computed(() => {
-  if (filtroEstado.value === "Todas") return reservationStore.reservations;
-  return reservationStore.reservations.filter(
-      (r) => reservationStore.states[r.reservationState] === filtroEstado.value
+  if (filtroEstado.value === "Todas") return reservations.reservations.value;
+  return reservations.reservations.value.filter(
+      (r) => reservations.states[r.reservationState] === filtroEstado.value
   );
 });
 
 // 🎨 Clases visuales
 function badgeClass(estado) {
-  const e = reservationStore.states[estado];
+  const e = reservations.states[estado];
   switch (e) {
     case "Pendiente": return "bg-warning text-dark";
     case "Aceptada": return "bg-success";
@@ -123,31 +205,36 @@ function goToPayment(reservaId) {
             <!-- 🖼️ Foto y datos -->
             <div class="d-flex align-items-center flex-grow-1">
               <img
-                  :src="reserva.carer.profilePhoto"
+                  :src="reserva.carer?.user?.profilePhoto || reserva.carer?.profilePhoto || 'https://i.pravatar.cc/150?u=' + reserva.carerId"
                   class="rounded-circle me-3"
                   width="60"
                   height="60"
+                  alt="Foto del cuidador"
               />
               <div>
                 <h5 class="card-title mb-1">
-                  {{ reserva.carer.name }} {{ reserva.carer.lastName }}
+                  {{ reserva.carer?.user?.name || reserva.carer?.name || 'Desconocido' }} 
+                  {{ reserva.carer?.user?.lastName || reserva.carer?.lastName || '' }}
                   <span
                       class="badge ms-2"
                       :class="badgeClass(reserva.reservationState)"
                   >
-                {{ reservationStore.states[reserva.reservationState] }}
+                {{ reservations.states[reserva.reservationState] }}
               </span>
                 </h5>
                 <strong>Servicios:</strong>
-                <p
-                    v-for="rel in reservationStore.reservationServices.filter(
-                (rs) => rs.reservationId === reserva.id
-              )"
-                    :key="rel.id"
-                    class="mb-1"
-                >
-                  {{ rel.service.name }}
-                </p>
+                <div v-if="reservations.reservationServices.value.filter((rs) => rs.reservationId === reserva.id).length > 0">
+                  <p
+                      v-for="rel in reservations.reservationServices.value.filter(
+                  (rs) => rs.reservationId === reserva.id
+                )"
+                      :key="rel.id"
+                      class="mb-1"
+                  >
+                    {{ rel.service?.name || 'Servicio desconocido' }}
+                  </p>
+                </div>
+                <p v-else class="text-muted mb-1">Cargando servicios...</p>
                 <p>
                   <strong>Fecha:</strong> {{ formatDate(reserva.serviceDate) }}
                 </p>
@@ -156,18 +243,15 @@ function goToPayment(reservaId) {
 
             <!-- ⚙️ Botones -->
             <div class="ms-3 d-flex flex-column gap-2">
-              <button class="btn btn-sm btn-outline-primary">Detalles</button>
-              <button class="btn btn-sm btn-outline-success">Contactar</button>
-
               <button
-                  v-if="reservationStore.states[reserva.reservationState] === 'Pendiente'"
+                  v-if="reservations.states[reserva.reservationState] === 'Pendiente'"
                   class="btn btn-sm btn-outline-danger"
               >
                 Cancelar
               </button>
 
               <button
-                  v-if="reservationStore.states[reserva.reservationState] === 'Finalizada'"
+                  v-if="reservations.states[reserva.reservationState] === 'Finalizada'"
                   class="btn btn-sm btn-outline-primary"
                   @click="goToPayment(reserva.id)"
               >
@@ -182,14 +266,14 @@ function goToPayment(reservaId) {
       <div>
         <!-- 🔸 Sin reservas -->
         <div
-            v-if="reservasFiltradas.length === 0 && !reservationStore.loading"
+            v-if="reservasFiltradas.length === 0 && !reservations.loading.value"
             class="text-center text-muted"
         >
           <h3>No hay reservas en este estado.</h3>
         </div>
 
         <!-- 🔸 Cargando -->
-        <div v-if="reservationStore.loading" class="text-center my-4">
+        <div v-if="reservations.loading.value" class="text-center my-4">
           <div class="spinner-border text-primary" role="status">
             <span class="visually-hidden">Cargando...</span>
           </div>
@@ -198,16 +282,16 @@ function goToPayment(reservaId) {
     </div>
 
     <!-- 🔹 Paginación -->
-    <nav v-if="reservationStore.pageable.totalPages > 1" class="mt-4">
+    <nav v-if="reservations.pageable.value.totalPages > 1" class="mt-4">
       <ul class="pagination justify-content-center">
         <li class="page-item" :class="{ disabled: paginaActual === 1 }">
           <button class="page-link" @click="paginaAnterior">Anterior</button>
         </li>
-        <li class="page-item" v-for="n in reservationStore.pageable.totalPages"
+        <li class="page-item" v-for="n in reservations.pageable.value.totalPages"
             :key="n" :class="{ active: n === paginaActual }">
           <button class="page-link" @click="irAPagina(n)">{{ n }}</button>
         </li>
-        <li class="page-item" :class="{ disabled: paginaActual === reservationStore.pageable.totalPages }">
+        <li class="page-item" :class="{ disabled: paginaActual === reservations.pageable.value.totalPages }">
           <button class="page-link" @click="paginaSiguiente">Siguiente</button>
         </li>
       </ul>

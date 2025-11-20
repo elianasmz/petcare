@@ -1,33 +1,33 @@
 <script setup>
 import {onMounted, ref} from "vue"
-import {useReservationsStore} from "../stores/reservationsStore.js"
+import {useReservations} from "../composables/useReservations.js"
 
-const reservationsStore = useReservationsStore()
+const reservations = useReservations()
 
 const resId = ref("");
 const serId = ref("");
 
 async function buscarReservation() {
   if (!resId.value) return;
-  await reservationsStore.getReservationById(resId.value);
+  await reservations.getReservationById(resId.value);
 }
 
 async function buscarService() {
   if (!serId.value) return;
-  await reservationsStore.getServicesByReservation(serId.value);
+  await reservations.getServicesByReservation(serId.value);
 }
 
 onMounted(() => {
-  reservationsStore.getAllReservations()
-  reservationsStore.getAllReservationServices()
+  reservations.getAllReservations()
+  reservations.getAllReservationServices()
 })
 </script>
 
 <template>
   <div>
     <h2 class="mt-5">Paginas de pruebas</h2>
-    <div v-if="reservationsStore.loading">Cargando...</div>
-    <div v-else-if="reservationsStore.error" class="text-danger">{{ reservationsStore.error }}</div>
+    <div v-if="reservations.loading.value">Cargando...</div>
+    <div v-else-if="reservations.error.value" class="text-danger">{{ reservations.error.value }}</div>
     <!-- Buscadores-->
     <div class="container mt-1">
       <div class="row">
@@ -38,11 +38,11 @@ onMounted(() => {
             <input v-model="resId" class="form-control" placeholder="Buscar..."/>
             <button @click="buscarReservation" class="btn btn-primary mt-2">Buscar</button>
           </div>
-          <div v-if="reservationsStore.selectedReservation" class="mt-1">
-            <p>ID: {{ reservationsStore.selectedReservation.id }}</p>
-            <p>Owner: {{ reservationsStore.selectedReservation.owner.name }}</p>
-            <p>Carer: {{ reservationsStore.selectedReservation.carer.name }}</p>
-            <p>Estado: {{ reservationsStore.states[reservationsStore.selectedReservation.reservationState] }}</p>
+          <div v-if="reservations.selectedReservation.value" class="mt-1">
+            <p>ID: {{ reservations.selectedReservation.value.id }}</p>
+            <p>Owner: {{ reservations.selectedReservation.value.owner.name }}</p>
+            <p>Carer: {{ reservations.selectedReservation.value.carer.name }}</p>
+            <p>Estado: {{ reservations.states[reservations.selectedReservation.value.reservationState] }}</p>
           </div>
         </div>
         <!-- Columna 2: Buscador de servicios -->
@@ -52,7 +52,7 @@ onMounted(() => {
             <input v-model="serId" class="form-control" placeholder="Ingrese la reserva ID"/>
             <button @click="buscarService" class="btn btn-primary mt-2">Buscar</button>
           </div>
-          <div v-if="reservationsStore.selectedService" v-for="r in reservationsStore.selectedService" :key="r.id"
+          <div v-if="reservations.selectedServices.value" v-for="r in reservations.selectedServices.value" :key="r.id"
                class="mt-1">
             <p>ID: {{ r.id }}</p>
             <p>Servicio: {{ r.service.name }}</p>
@@ -71,11 +71,11 @@ onMounted(() => {
       </tr>
       </thead>
       <tbody>
-      <tr v-for="r in reservationsStore.reservations" :key="r.id">
+      <tr v-for="r in reservations.reservations.value" :key="r.id">
         <td>{{ `${r.owner.name} ${r.owner.lastName}` }}</td>
         <td>{{ `${r.carer.name} ${r.carer.lastName}` }}</td>
         <td>{{ r.serviceDate }}</td>
-        <td>{{ reservationsStore.states[r.reservationState] }}</td>
+        <td>{{ reservations.states[r.reservationState] }}</td>
       </tr>
       </tbody>
     </table>
@@ -90,7 +90,7 @@ onMounted(() => {
       </tr>
       </thead>
       <tbody>
-      <tr v-for="r in reservationsStore.reservationServices" :key="r.id">
+      <tr v-for="r in reservations.reservationServices.value" :key="r.id">
         <td>{{ r.id }}</td>
         <td>{{ r.reservationId }}</td>
         <td>{{ r.service.id }}</td>

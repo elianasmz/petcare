@@ -1,10 +1,10 @@
 <script setup>
 import { ref, reactive } from "vue";
 import { useRouter } from "vue-router";
-import { useUserStore } from "../stores/userStore.js";
+import { useAuth } from "../composables/useAuth.js";
 
 const router = useRouter();
-const userStore = useUserStore();
+const auth = useAuth();
 const mode = ref("login"); // login | register
 
 // Login
@@ -48,18 +48,18 @@ async function handleLogin() {
   }
 
   try {
-    await userStore.login(loginForm.email, loginForm.password);
+    await auth.login(loginForm.email, loginForm.password);
     
     // Redirigir según el rol del usuario
-    if (userStore.isCarer) {
+    if (auth.isCarer.value) {
       router.push("/carer");
-    } else if (userStore.isOwner) {
+    } else if (auth.isOwner.value) {
       router.push("/");
     } else {
       router.push("/");
     }
   } catch (err) {
-    loginError.value = userStore.error || "Error al iniciar sesión. Verifica tus credenciales.";
+    loginError.value = auth.error.value || "Error al iniciar sesión. Verifica tus credenciales.";
   }
 }
 
@@ -107,18 +107,18 @@ async function handleRegister() {
   };
 
   try {
-    await userStore.register(registerData);
+    await auth.register(registerData);
     
     // Redirigir según el rol del usuario
-    if (userStore.isCarer) {
+    if (auth.isCarer.value) {
       router.push("/carer");
-    } else if (userStore.isOwner) {
+    } else if (auth.isOwner.value) {
       router.push("/");
     } else {
       router.push("/");
     }
   } catch (err) {
-    registerError.value = userStore.error || "Error al registrar usuario. Intenta nuevamente.";
+    registerError.value = auth.error.value || "Error al registrar usuario. Intenta nuevamente.";
   }
 }
 </script>
@@ -149,8 +149,8 @@ async function handleRegister() {
         </div>
         <input type="email" v-model="loginForm.email" placeholder="Correo electrónico" required />
         <input type="password" v-model="loginForm.password" placeholder="Contraseña" required />
-        <button type="submit" class="btn-primary" :disabled="userStore.loading">
-          {{ userStore.loading ? 'Iniciando sesión...' : 'Ingresar' }}
+        <button type="submit" class="btn-primary" :disabled="auth.loading.value">
+          {{ auth.loading.value ? 'Iniciando sesión...' : 'Ingresar' }}
         </button>
       </form>
 
@@ -186,8 +186,8 @@ async function handleRegister() {
         </div>
         </div>
 
-        <button type="submit" class="btn-primary" :disabled="userStore.loading">
-          {{ userStore.loading ? 'Registrando...' : 'Registrarse' }}
+        <button type="submit" class="btn-primary" :disabled="auth.loading.value">
+          {{ auth.loading.value ? 'Registrando...' : 'Registrarse' }}
         </button>
 
       </form>

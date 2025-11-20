@@ -8,7 +8,11 @@ class ServiceApi {
         this.serviceApi.interceptors.response.use(
             response => response,
             error => {
-                console.error(`[ServiceApi] Error:`, error.response?.data || error.message)
+                // Solo loguear errores críticos (no 404, 503 esperados)
+                const status = error.response?.status
+                if (status !== 404 && status !== 503) {
+                    console.error(`[ServiceApi] Error:`, error.response?.data || error.message)
+                }
                 return Promise.reject(error)
             }
         )

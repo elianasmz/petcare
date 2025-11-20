@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import AuthApi from '../api/AuthApi.js'
 import { useUsersStore } from './usersStore.js'
+import { getUserIdFromToken } from '../utils/jwtUtils.js'
 
 export const useUserStore = defineStore('user', {
   state: () => ({
@@ -36,6 +37,20 @@ export const useUserStore = defineStore('user', {
       return state.roles.some(role => 
         role.toLowerCase().includes('admin')
       )
+    },
+    // Getter que obtiene el ID del usuario desde el store o del token como fallback
+    userId: (state) => {
+      if (state.user?.id) {
+        return state.user.id
+      }
+      if (state.token) {
+        try {
+          return getUserIdFromToken(state.token)
+        } catch (err) {
+          return null
+        }
+      }
+      return null
     }
   },
 

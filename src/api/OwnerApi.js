@@ -2,37 +2,29 @@ import { axiosInstance } from './axiosInstance.js'
 
 class OwnerApi {
     constructor() {
-        // Los owners están en el microservicio de service (puerto 8083)
-        this.ownerApi = axiosInstance
+        this.ownerApi = axiosInstance;
 
-        // Interceptor de respuesta para manejo global de errores
         this.ownerApi.interceptors.response.use(
             response => response,
             error => {
-                console.error(`[OwnerApi] Error:`, error.response?.data || error.message)
-                return Promise.reject(error)
+                const status = error.response?.status;
+                if (status !== 404 && status !== 503) {
+                    console.error(`[OwnerApi] Error:`, error.response?.data || error.message);
+                }
+                return Promise.reject(error);
             }
-        )
+        );
     }
 
-    // ==================== OWNERS ====================
-    // Rutas a través del gateway: /apirest-services/**
-
-    /**
-     * Obtener todos los propietarios
-     * GET /apirest-services/owners
-     */
+    // Obtener cuidadores disponibles
     getOwners() {
-        return this.ownerApi.get('/apirest-services/owners')
+        return this.ownerApi.get('/users/carers/available');
     }
 
-    /**
-     * Obtener un propietario por ID
-     * GET /apirest-services/owners/{id}
-     */
+    // Obtener usuario por ID (puede ser dueño)
     getOwnerById(ownerId) {
-        return this.ownerApi.get(`/apirest-services/owners/${ownerId}`)
+        return this.ownerApi.get(`/users/${ownerId}`);
     }
 }
 
-export default new OwnerApi()
+export default new OwnerApi();

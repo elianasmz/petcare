@@ -121,8 +121,11 @@ export const useCarersStore = defineStore('carers', {
         /**
          * Obtener cuidador por ID desde el estado
          */
-        getCarerByIdMy(id) {
+        /*getCarerByIdMy(id) {
             return this.carers.find(c => c.user.id === id)
+        },*/
+        getCarerByIdMy(id) {
+            return this.carers.find(c => c.id === id) || null;
         },
 
 

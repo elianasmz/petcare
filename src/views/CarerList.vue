@@ -1,12 +1,12 @@
 <script setup>
 import { ref, computed, onMounted } from "vue"
 import { useRouter } from "vue-router"
-import { useCarersStore } from "../stores/carersStore.js"
-import { useServicesStore } from "../stores/servicesStore.js"
+import { useCarers } from "../composables/useCarers.js"
+import { useServices } from "../composables/useServices.js"
 
 const router = useRouter()
-const carersStore = useCarersStore()
-const servicesStore = useServicesStore()
+const carers = useCarers()
+const services = useServices()
 
 // --- Filtros ---
 const selectedServiceType = ref(null)
@@ -21,19 +21,22 @@ onMounted(async () => {
   error.value = null
 
   try {
-    // 1️⃣ Cargar cuidadores
-    await carersStore.fetchCarers()
+    // 1️⃣ Cargar tipos de servicio y cuidadores en paralelo
+    await Promise.all([
+      services.fetchServiceTypes(),
+      carers.fetchAllCarers()
+    ])
 
     // 2️⃣ Cargar servicios reales de cada cuidador
     await Promise.all(
-      carersStore.carers.map(async (carer) => {
-        const response = await servicesStore.fetchServicesByCarer(carer.id)
+      carers.carers.value.map(async (carer) => {
+        const response = await services.fetchServicesByCarer(carer.id)
         carer.services = [...response] || []  // Guardamos los servicios dentro del cuidador
       })
     )
 
   } catch (err) {
-    error.value = "Error cargando cuidadores. " + (err.message || carersStore.error)
+    error.value = "Error cargando cuidadores. " + (err.message || carers.error.value)
   } finally {
     loading.value = false
   }
@@ -51,7 +54,7 @@ function translateAvailabilityState(state) {
 
 // --- Juntar cuidadores + servicios ---
 const carersWithServices = computed(() => {
-  return carersStore.carers.map(c => ({
+  return carers.carers.value.map(c => ({
     id: c.id,
     name: `${c.name} ${c.lastName}`,
     photo: c.profilePhoto,
@@ -117,7 +120,7 @@ function viewDetail(carer) {
               <label class="form-label fw-bold">Por tipo de servicio</label>
               <select v-model.number="selectedServiceType" class="form-select">
                 <option :value="null">Todos los servicios</option>
-                <option v-for="type in servicesStore.serviceTypes" :key="type.id" :value="type.id">
+                <option v-for="type in services.serviceTypes.value" :key="type.id" :value="type.id">
                   {{ type.name }}
                 </option>
               </select>

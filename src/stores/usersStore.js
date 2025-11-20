@@ -68,14 +68,20 @@ export const useUsersStore = defineStore('users', {
                     try {
                         await this.fetchUserRoles(data.id);
                     } catch (roleErr) {
-                        console.warn('No se pudieron cargar los roles del usuario:', roleErr)
+                        // Solo loguear si no es un error esperado (503, 404)
+                        if (roleErr.response?.status !== 503 && roleErr.response?.status !== 404) {
+                            console.warn('No se pudieron cargar los roles del usuario:', roleErr)
+                        }
                         // No fallar si no se pueden cargar los roles
                     }
                 }
                 return data
             } catch (err) {
                 this.error = err.response?.data?.message || err.message
-                console.error('Error en fetchUserByEmail:', err)
+                // Solo loguear si no es un error esperado (503)
+                if (err.response?.status !== 503) {
+                    console.error('Error en fetchUserByEmail:', err)
+                }
                 throw err
             } finally {
                 this.loading = false

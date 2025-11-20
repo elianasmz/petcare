@@ -20,15 +20,15 @@
 <script setup>
 import { onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { useUserStore } from './stores/userStore.js';
+import { useAuth } from './composables/useAuth.js';
 import NavBar from './components/NavBar.vue';
 
 const router = useRouter();
-const userStore = useUserStore();
+const auth = useAuth();
 
 // Manejar evento de no autorizado (401)
 function handleUnauthorized() {
-  userStore.logout();
+  auth.logout();
   router.push('/login');
 }
 

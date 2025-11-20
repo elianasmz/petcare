@@ -2,24 +2,24 @@
 <script setup>
 import { computed } from "vue";
 import { useRouter } from "vue-router";
-import { useUserStore } from "../stores/userStore.js";
+import { useAuth } from "../composables/useAuth.js";
 import logo from "../assets/logo.png";
 
 const router = useRouter();
-const userStore = useUserStore();
+const auth = useAuth();
 
-const isAuthenticated = computed(() => userStore.isAuthenticated);
-const username = computed(() => userStore.username || userStore.user?.name || "Usuario");
-const isCarer = computed(() => userStore.isCarer);
-const isOwner = computed(() => userStore.isOwner);
+const isAuthenticated = computed(() => auth.isAuthenticated.value);
+const username = computed(() => auth.username.value || auth.user.value?.name || "Usuario");
+const isCarer = computed(() => auth.isCarer.value);
+const isOwner = computed(() => auth.isOwner.value);
 
 function handleLogout() {
-  userStore.logout();
+  auth.logout();
   router.push("/");
 }
 
 function goToProfile() {
-  if (userStore.isCarer) {
+  if (auth.isCarer.value) {
     router.push("/carer");
   } else {
     router.push("/");

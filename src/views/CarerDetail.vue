@@ -1,17 +1,15 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-// 1. Importar los stores reales
-import { useUsersStore } from "../stores/usersStore.js";
-import { useServicesStore } from "../stores/servicesStore.js";
-import { useReservationsStore } from "../stores/reservationsStore.js";
+import { useUsers } from "../composables/useUsers.js";
+import { useServices } from "../composables/useServices.js";
+import { useReservations } from "../composables/useReservations.js";
+import { useAuth } from "../composables/useAuth.js";
+import { useOwners } from "../composables/useOwners.js";
+import { getUserIdFromToken } from "../utils/jwtUtils.js";
 
-const reservationsStore = useReservationsStore();
+const reservations = useReservations();
 
-// (No necesitas useRoute si usas props)
-
-// 2. Definir 'props' para recibir el ID del router
-// (Tu router/index.js ya tiene 'props: true' para esta ruta, lo cual es perfecto)
 const props = defineProps({
   id: {
     type: [String, Number],
@@ -21,33 +19,34 @@ const props = defineProps({
 
 const router = useRouter();
 
-// 3. Obtener los stores
-const userStore = useUsersStore();
-const servicesStore = useServicesStore();
+const users = useUsers();
+const services = useServices();
+const auth = useAuth();
+const owners = useOwners();
 
 const loading = ref(false);
 const error = ref(null);
 
-// 4. Referencias a los datos de los stores
-const carerProfile = computed(() => userStore.currentUser);
-const carerServices = computed(() => servicesStore.services);
+// 4. Referencias a los datos de los composables
+const carerProfile = computed(() => users.currentUser.value);
+const carerServices = computed(() => services.services.value);
 
 // 5. Cargar los datos reales del backend al montar
 onMounted(async () => {
   loading.value = true;
   error.value = null;
-  // Limpiar stores de datos anteriores
-  userStore.clearCurrentUser();
-  servicesStore.clearServices();
+  // Limpiar composables de datos anteriores
+  users.clearCurrentUser();
+  services.clearServices();
   
   const carerId = Number(props.id);
   
   try {
     // Cargar tipos de servicio (para los nombres) y los datos del cuidador/servicios en paralelo
     await Promise.all([
-      servicesStore.fetchServiceTypes(), // Para saber el nombre de "Paseo", "Alojamiento"
-      userStore.fetchUserById(carerId),
-      servicesStore.fetchServices({ carerId: carerId, size: 100 })
+      services.fetchServiceTypes(), // Para saber el nombre de "Paseo", "Alojamiento"
+      users.fetchUserById(carerId),
+      services.fetchServices({ carerId: carerId, size: 100 })
     ]);
   } catch (err) {
     console.error("Error fetching data:", err);
@@ -71,8 +70,73 @@ const totalPrice = computed(() => {
   }, 0);
 });
 
+// Función para obtener ownerId del usuario en sesión
+async function getOwnerIdFromSession() {
+  try {
+    // Primero intentar obtener el ID del usuario desde el composable
+    let userId = auth.user.value?.id;
+    
+    // Si no tenemos el usuario completo, intentar cargarlo
+    if (!userId) {
+      if (auth.username.value) {
+        try {
+          await users.fetchUserByEmail(auth.username.value);
+          if (users.currentUser.value) {
+            auth.user.value = users.currentUser.value;
+            userId = auth.user.value?.id;
+          }
+        } catch (err) {
+          // Si falla obtener el usuario (503, etc.), no loguear si es 503
+          if (err.response?.status !== 503) {
+            console.warn("No se pudo cargar usuario completo:", err);
+          }
+        }
+      }
+    }
+    
+    // Si aún no tenemos userId, intentar extraerlo del token JWT
+    if (!userId && auth.token.value) {
+      const tokenUserId = getUserIdFromToken(auth.token.value);
+      if (tokenUserId) {
+        userId = tokenUserId;
+        // Guardar en el composable para futuras referencias
+        if (!auth.user.value) {
+          auth.user.value = { id: userId };
+        } else {
+          auth.user.value.id = userId;
+        }
+      }
+    }
+    
+    if (!userId) {
+      console.warn("No se pudo obtener el ID del usuario desde el composable ni del token");
+      return null;
+    }
+    
+    // En la mayoría de arquitecturas, ownerId = userId cuando el usuario tiene rol OWNER
+    // Intentar obtener el owner solo si es necesario, pero no fallar si no existe
+    try {
+      await owners.getOwnerById(userId);
+      const owner = owners.owners.value.find(o => o.id === userId || o.userId === userId);
+      if (owner && owner.id) {
+        return owner.id;
+      }
+    } catch (err) {
+      // Si el endpoint no existe o falla, usar userId directamente
+      // No loguear errores 404/503 ya que son esperados
+    }
+    
+    // Fallback: usar userId como ownerId (común cuando ownerId = userId)
+    return userId;
+  } catch (err) {
+    // Último fallback: intentar desde token o composable
+    return auth.user.value?.id || (auth.token.value ? getUserIdFromToken(auth.token.value) : null);
+  }
+}
+
 // 7. Función para confirmar reserva (simulada por ahora)
 async function bookCaretaker() {
+  // 1️⃣ Validaciones previas
   if (selectedServices.value.length === 0) {
     alert("Debes seleccionar al menos un servicio.");
     return;
@@ -81,39 +145,54 @@ async function bookCaretaker() {
     alert("Debes seleccionar una fecha.");
     return;
   }
-    
-  const date = new Date(reservationDate.value + "T10:00:00-03:00");
-  const serviceDateUTC = date.toISOString(); // Ej: "2025-11-13T13:00:00.000Z"
-
-
-  // Datos de la reservación
-  const reservationData = {
-    carerId: Number(props.id),
-    ownerId: 1, // Reemplaza con el ID del usuario logueado
-    serviceDate: serviceDateUTC,
-    note: note.value,
-    totalPrice: totalPrice.value
-  };
 
   try {
-    // 1️⃣ Crear la reservación principal
-    const res = await reservationsStore.postReservation(reservationData);
-    const reservationId = res?.content?.id;
-    if (!reservationId) throw new Error("No se pudo obtener el ID de la reservación.");
-
-    // 2️⃣ Crear las relaciones ReservationService
-    for (const serviceId of selectedServices.value) {
-      await reservationsStore.postReservationService({
-        reservationId,
-        serviceId
-      });
+    // Obtener ownerId del usuario en sesión
+    const ownerId = await getOwnerIdFromSession();
+    if (!ownerId) {
+      alert("No se pudo obtener el ID del propietario. Por favor, inicia sesión nuevamente.");
+      return;
     }
 
-    alert(`Reserva creada correctamente. Total: Gs. ${totalPrice.value.toLocaleString('es-PY')}`);
+    // 2️⃣ Convertir fecha a ISO (UTC)
+    const date = new Date(reservationDate.value + "T10:00:00-03:00");
+    const serviceDateUTC = date.toISOString();
+
+    // 3️⃣ Datos de la reservación
+    const reservationData = {
+      carerId: Number(props.id),
+      ownerId: ownerId, // ID del usuario logueado
+      serviceDate: serviceDateUTC,
+      note: note.value,
+      totalPrice: totalPrice.value,
+      reservationState: "PENDING"
+    };
+
+    // 4️⃣ Crear la reservación principal
+    const reservation = await reservations.postReservation(reservationData)
+    const reservationId = reservation.id   // ✅ ahora sí funciona
+
+    if (!reservationId) throw new Error("No se pudo obtener el ID de la reservación.");
+
+    // 5️⃣ Crear relaciones Reservation-Service para cada servicio
+    for (const serviceId of selectedServices.value) {
+      try {
+        const res = await reservations.postReservationService({ reservationId, serviceId });
+        console.log("Servicio agregado:", res);
+      } catch (err) {
+        console.error(`Error agregando serviceId ${serviceId}:`, err);
+        alert(`No se pudo agregar el servicio con ID ${serviceId}.`);
+      }
+    }
+
+    // 6️⃣ Confirmación
+    //alert(`Reserva creada correctamente. Total: Gs. ${totalPrice.value.toLocaleString('es-PY')}`);
     router.push("/reservations"); // Ir a "Mis Reservas"
+
   } catch (err) {
-    console.error("Error al crear la reserva:", err);
-    alert("Hubo un error al crear la reserva. Revisa la consola.");
+    console.error("Error al crear la reservación:", err);
+    // Mostrar mensaje específico del backend si existe
+    alert(err.response?.data?.message || "Hubo un error al crear la reservación.");
   }
 }
 
@@ -124,7 +203,7 @@ function goBack() {
 
 // Función para obtener el nombre del tipo de servicio
 function getServiceTypeName(typeId) {
-  const type = servicesStore.serviceTypes.find(t => t.id === typeId);
+  const type = services.serviceTypes.value.find(t => t.id === typeId);
   return type ? type.name : 'Servicio';
 }
 </script>

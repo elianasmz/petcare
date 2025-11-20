@@ -1,154 +1,229 @@
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
+import ReservationApi from "../api/ReservationApi.js";
+import OwnerApi from "../api/OwnerApi.js";
+import ServiceApi from "../api/ServiceApi.js";
 
-// Datos de ejemplo
-const caretaker = ref({
-  name: "María López",
-  photo: "https://randomuser.me/api/portraits/women/44.jpg",
-});
+const carerId = 8; // ID del cuidador logueado (luego lo sacas de auth)
+const loading = ref(false);
+const error = ref(null);
 
-const receivedReservations = ref([
-  { id: 1, owner: "Juan Pérez", services: [{ name: "Paseo", price: 15 }, { name: "Visita a domicilio", price: 10 }], status: "Pendiente" },
-  { id: 2, owner: "Laura Gómez", services: [{ name: "Hospedaje", price: 50 }], status: "Pendiente" },
-]);
+const receivedReservations = ref([]); // Pendientes
+const activeReservations = ref([]);   // Aceptadas
 
-const activeReservations = ref([
-  { id: 3, owner: "María López", services: [{ name: "Paseo", price: 15 }], status: "Aceptada" },
-]);
+// Datos para el modal
+const showModal = ref(false);
+const selectedReservation = ref(null);
+const ownerDetails = ref(null);
+const servicesDetails = ref([]);
 
-// Modal de rechazo
-const showRejectModal = ref(false);
-const rejectReason = ref("");
-let currentReservation = ref(null);
+async function loadReservations() {
+  loading.value = true;
+  error.value = null;
 
-// Funciones
-function acceptReservation(reservation) {
-  reservation.status = "Aceptada";
-  activeReservations.value.push(reservation);
-  receivedReservations.value = receivedReservations.value.filter(r => r.id !== reservation.id);
-}
+  try {
+    const all = await ReservationApi.getReservationsByCarer(
+      carerId,
+      ["Pendiente", "Aceptada"]
+    );
 
-function openRejectModal(reservation) {
-  currentReservation.value = reservation;
-  rejectReason.value = "";
-  showRejectModal.value = true;
-}
+    receivedReservations.value = all.filter(r => r.reservationState === "Pendiente");
+    activeReservations.value   = all.filter(r => r.reservationState === "Aceptada");
 
-function confirmReject() {
-  if (currentReservation.value) {
-    currentReservation.value.status = "Rechazada";
-    currentReservation.value.reason = rejectReason.value;
-    receivedReservations.value = receivedReservations.value.filter(r => r.id !== currentReservation.value.id);
-    showRejectModal.value = false;
+  } catch (e) {
+    error.value = e.response?.data?.message || e.message;
+  } finally {
+    loading.value = false;
   }
 }
 
-function finishReservation(reservation) {
-  reservation.status = "Finalizada";
-  activeReservations.value = activeReservations.value.filter(r => r.id !== reservation.id);
+async function openReservationDetails(reservation) {
+  selectedReservation.value = reservation;
+  showModal.value = true;
+
+  try {
+    // Dueño
+    ownerDetails.value = await OwnerApi.getOwnerById(reservation.ownerId).then(r => r.data);
+
+    // Servicios
+    const rel = await ReservationApi.getReservationServicesByReservationId(reservation.id);
+    servicesDetails.value = await Promise.all(
+      rel.map(s => ServiceApi.getServiceById(s.serviceId).then(r => r.data))
+    );
+
+  } catch (e) {
+    console.error("Error al cargar detalles:", e);
+  }
 }
 
-function editProfilePhoto() {
-  alert("Aquí puedes implementar la carga de foto de perfil");
+// CAMBIAR ESTADO DE RESERVA
+async function updateReservationState(reservationId, newState) {
+  try {
+    const response = await ReservationApi.putReservation(reservationId, {
+      reservationState: newState
+    });
+
+    // Cerrar modal
+    showModal.value = false;
+
+    // Recargar listas
+    await loadReservations();
+
+    return response;
+
+  } catch (e) {
+    console.error("Error actualizando estado:", e);
+  }
 }
 
-function totalPrice(services) {
-  return services.reduce((sum, s) => sum + s.price, 0);
-}
+onMounted(loadReservations);
 </script>
 
 <template>
-  <div class="container mt-4">
+  <div class="p-5">
+    <h2 class="text-2xl font-bold mb-4">Mis Reservas</h2>
 
-    <!-- Reservas recibidas -->
-    <h3>Reservas recibidas</h3>
-    <div v-if="receivedReservations.length">
-      <div v-for="res in receivedReservations" :key="res.id" class="card mb-3">
-        <div class="card-body d-flex justify-content-between align-items-center">
-          <div>
-            <strong>{{ res.owner }}</strong>
-            <p>Servicios: {{ res.services.map(s => s.name + ' ($' + s.price + ')').join(", ") }}</p>
-            <p><strong>Total:</strong> ${{ totalPrice(res.services) }}</p>
-          </div>
-          <div class="d-flex gap-2">
-            <button class="btn btn-success btn-sm" @click="acceptReservation(res)">Aceptar</button>
-            <button class="btn btn-danger btn-sm" @click="openRejectModal(res)">Rechazar</button>
-          </div>
+    <!-- Loading -->
+    <div v-if="loading" class="text-blue-500 font-semibold">Cargando reservas...</div>
+
+    <!-- Error -->
+    <div v-if="error" class="text-red-500">{{ error }}</div>
+
+    <!-- RESERVAS PENDIENTES -->
+    <h3 class="text-xl font-semibold mt-6 mb-2">📩 Reservas Nuevas</h3>
+
+    <div v-if="receivedReservations.length === 0" class="text-gray-600">
+      No tienes reservas nuevas.
+    </div>
+
+    <div
+      v-for="r in receivedReservations"
+      :key="r.id"
+      class="border p-4 rounded mb-3 cursor-pointer hover:bg-gray-50"
+      @click="openReservationDetails(r)"
+    >
+      <p><strong>ID:</strong> {{ r.id }}</p>
+      <p><strong>Fecha:</strong> {{ r.serviceDate }}</p>
+      <p><strong>Estado:</strong> {{ r.reservationState }}</p>
+    </div>
+
+    <!-- RESERVAS ACTIVAS -->
+    <h3 class="text-xl font-semibold mt-6 mb-2">🟢 Reservas Activas</h3>
+
+    <div v-if="activeReservations.length === 0" class="text-gray-600">
+      No tienes reservas en curso.
+    </div>
+
+    <div
+      v-for="r in activeReservations"
+      :key="r.id"
+      class="border p-4 rounded mb-3 cursor-pointer hover:bg-gray-50"
+      @click="openReservationDetails(r)"
+    >
+      <p><strong>ID:</strong> {{ r.id }}</p>
+      <p><strong>Fecha:</strong> {{ r.serviceDate }}</p>
+      <p><strong>Estado:</strong> {{ r.reservationState }}</p>
+    </div>
+
+    <!-- MODAL -->
+    <div v-if="showModal" class="modal-overlay">
+      <div class="modal-content">
+        <h3 class="text-xl font-bold mb-2">Detalles de la Reserva</h3>
+
+        <p><strong>ID:</strong> {{ selectedReservation.id }}</p>
+        <p><strong>Fecha:</strong> {{ selectedReservation.serviceDate }}</p>
+
+        <hr class="my-3">
+
+        <h4 class="font-semibold">👤 Dueño</h4>
+        <p v-if="ownerDetails">
+          {{ ownerDetails.name }} {{ ownerDetails.lastName }}<br>
+          {{ ownerDetails.email }}
+        </p>
+
+        <hr class="my-3">
+
+        <h4 class="font-semibold">🛁 Servicios</h4>
+        <ul>
+          <li v-for="s in servicesDetails" :key="s.id">
+            {{ s.name }} — {{ s.price }} Gs.
+          </li>
+        </ul>
+
+        <!-- BOTONES -->
+        <div class="flex justify-end gap-2 mt-5">
+          <button class="btn-secondary" @click="showModal = false">Cerrar</button>
+
+          <!-- Mostrar botones según estado -->
+          <button
+            v-if="selectedReservation.reservationState === 'Pendiente'"
+            class="btn-success"
+            @click="updateReservationState(selectedReservation.id, 'Aceptada')"
+          >
+            Aceptar
+          </button>
+
+          <button
+            v-if="selectedReservation.reservationState === 'Pendiente'"
+            class="btn-danger"
+            @click="updateReservationState(selectedReservation.id, 'Rechazada')"
+          >
+            Rechazar
+          </button>
+
+          <button
+            v-if="selectedReservation.reservationState === 'Aceptada'"
+            class="btn-primary"
+            @click="updateReservationState(selectedReservation.id, 'Finalizada')"
+          >
+            Finalizar
+          </button>
         </div>
       </div>
     </div>
-    <p v-else>No hay reservas recibidas.</p>
-
-    <!-- Reservas activas -->
-    <h3 class="mt-4">Reservas activas</h3>
-    <div v-if="activeReservations.length">
-      <div v-for="res in activeReservations" :key="res.id" class="card mb-3">
-        <div class="card-body d-flex justify-content-between align-items-center">
-          <div>
-            <strong>{{ res.owner }}</strong>
-            <p>Servicios: {{ res.services.map(s => s.name + ' ($' + s.price + ')').join(", ") }}</p>
-            <p><strong>Total:</strong> ${{ totalPrice(res.services) }}</p>
-          </div>
-          <button class="btn btn-primary btn-sm" @click="finishReservation(res)">Finalizar</button>
-        </div>
-      </div>
-    </div>
-    <p v-else>No hay reservas activas.</p>
-
-    <!-- Modal de rechazo -->
-    <div v-if="showRejectModal" class="modal-wrapper">
-      <div class="modal-dialog shadow">
-        <div class="modal-content p-3">
-          <div class="modal-header d-flex justify-content-between align-items-center">
-            <h5 class="modal-title">Motivo del rechazo</h5>
-            <button class="btn-close" @click="showRejectModal = false"></button>
-          </div>
-          <div class="modal-body">
-            <textarea v-model="rejectReason" class="form-control" rows="3" placeholder="Escriba el motivo..."></textarea>
-          </div>
-          <div class="modal-footer mt-2 d-flex justify-content-end gap-2">
-            <button class="btn btn-secondary" @click="showRejectModal = false">Cancelar</button>
-            <button class="btn btn-danger" @click="confirmReject">Confirmar Rechazo</button>
-          </div>
-        </div>
-      </div>
-      <div class="modal-backdrop"></div>
-    </div>
-
   </div>
 </template>
 
-<style scoped>
-.position-relative button {
-  font-size: 0.7rem;
-  padding: 0.2rem 0.4rem;
-}
-
-.modal-wrapper {
+<style>
+.modal-overlay {
   position: fixed;
-  top: 0; left: 0;
-  width: 100vw;
-  height: 100vh;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
   display: flex;
-  align-items: center;
   justify-content: center;
-  z-index: 1050;
+  align-items: center;
+  padding: 20px;
 }
-
-.modal-dialog {
+.modal-content {
   background: white;
-  border-radius: 5px;
-  z-index: 1100;
-  max-width: 400px;
-  width: 90%;
+  padding: 20px;
+  border-radius: 10px;
+  width: 450px;
+  max-width: 90%;
 }
 
-.modal-backdrop {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: rgba(0,0,0,0.5);
-  z-index: 1000;
+.btn-primary {
+  background: #2563eb;
+  color: white;
+  padding: 8px 14px;
+  border-radius: 6px;
+}
+.btn-success {
+  background: #16a34a;
+  color: white;
+  padding: 8px 14px;
+  border-radius: 6px;
+}
+.btn-danger {
+  background: #dc2626;
+  color: white;
+  padding: 8px 14px;
+  border-radius: 6px;
+}
+.btn-secondary {
+  background: #6b7280;
+  color: white;
+  padding: 8px 14px;
+  border-radius: 6px;
 }
 </style>

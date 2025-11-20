@@ -2,14 +2,14 @@
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router';
 import inicio from "../assets/inicio.jpg";
-import { useServicesStore } from '../stores/servicesStore'
+import { useServices } from '../composables/useServices.js'
 
 const router = useRouter();
-const servicesStore = useServicesStore()
+const services = useServices()
 
 // Cargar los tipos de servicio cuando se monta el componente
 onMounted(async () => {
-  await servicesStore.fetchServiceTypes()
+  await services.fetchServiceTypes()
 })
 
 function goToLogin() {
@@ -40,12 +40,12 @@ function goToLogin() {
     <section class="services">
       <div class="services-container">
         <h2>Servicios que ofrecemos</h2>
-        <div v-if="servicesStore.loading">Cargando servicios...</div>
-        <div v-else-if="servicesStore.error">Error: {{ servicesStore.error }}</div>
+        <div v-if="services.loading.value">Cargando servicios...</div>
+        <div v-else-if="services.error.value">Error: {{ services.error.value }}</div>
 
         <div v-else class="service-list">
           <!-- Render dinámico desde el backend -->
-          <div v-for="type in servicesStore.serviceTypes" :key="type.id" class="service-item">
+          <div v-for="type in services.serviceTypes.value" :key="type.id" class="service-item">
             {{ type.name }}
           </div>
         </div>

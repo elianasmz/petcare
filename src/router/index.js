@@ -1,6 +1,6 @@
 // src/router/index.js
 import { createRouter, createWebHistory } from 'vue-router';
-import { useUserStore } from '../stores/userStore.js';
+import { useAuth } from '../composables/useAuth.js';
 import Home from '../views/Home.vue';
 import Login from '../views/Login.vue';
 import CarerDashboard from '../views/CarerDashboard.vue';
@@ -60,16 +60,16 @@ const router = createRouter({
 
 // Guard de navegación
 router.beforeEach(async (to, from, next) => {
-  const userStore = useUserStore();
+  const auth = useAuth();
   
   // Si hay token pero no está validado, validarlo primero
-  if (userStore.token && !userStore.isAuthenticated) {
-    await userStore.validateToken();
+  if (auth.token.value && !auth.isAuthenticated.value) {
+    await auth.validateToken();
   }
 
   // Si la ruta requiere autenticación
   if (to.meta.requiresAuth) {
-    if (!userStore.isAuthenticated) {
+    if (!auth.isAuthenticated.value) {
       // Redirigir al login si no está autenticado
       next({ name: 'Login', query: { redirect: to.fullPath } });
       return;
@@ -78,7 +78,7 @@ router.beforeEach(async (to, from, next) => {
     // Si la ruta tiene roles permitidos, verificar
     if (to.meta.allowedRoles && to.meta.allowedRoles.length > 0) {
       const hasAllowedRole = to.meta.allowedRoles.some(role => 
-        userStore.roles.some(userRole => 
+        auth.roles.value.some(userRole => 
           userRole.toLowerCase() === role.toLowerCase() ||
           userRole.toLowerCase().includes(role.toLowerCase())
         )
@@ -93,7 +93,7 @@ router.beforeEach(async (to, from, next) => {
   }
 
   // Si está autenticado y trata de ir al login, redirigir al home
-  if (to.name === 'Login' && userStore.isAuthenticated) {
+  if (to.name === 'Login' && auth.isAuthenticated.value) {
     next({ name: 'Home' });
     return;
   }
