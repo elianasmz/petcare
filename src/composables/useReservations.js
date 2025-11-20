@@ -323,34 +323,32 @@ export function useReservations() {
   }
 
   async function getAllReservationServices() {
-    try {
-      const res = await ReservationApi.getAllRelations({ page: 0, size: 1000 })
-      const allServices = res.data.content || []
-      
-      // Enriquecer con datos de servicios
-      const enriched = await Promise.all(
-        allServices.map(async (rs) => {
-          let service = { name: "Servicio desconocido" }
-          try {
-            const fetchedService = await ServiceApi.getServiceTypeById(rs.serviceId)
-            service = fetchedService.data || service
-          } catch (err) {
-            console.warn(`No se pudo obtener servicio ${rs.serviceId}:`, err)
-          }
+  try {
+    const res = await ReservationApi.getAllReservationServices();
+    const relations = res.data;
+
+    // 🔥 cargar datos del servicio asociado a cada relación
+    const enriched = await Promise.all(
+      relations.map(async (rel) => {
+        try {
+          const serviceRes = await ServiceApi.getServiceTypeById(rel.serviceTypeId);
           return {
-            ...rs,
-            service: service,
-          }
-        })
-      )
-      
-      reservationServices.value = enriched
-      return enriched
-    } catch (err) {
-      console.error("Error al obtener todos los servicios de reservación:", err)
-      return []
-    }
+            ...rel,
+            service: serviceRes.data  // 👈 ahora getServicesForReservation tendrá datos reales
+          };
+        } catch (e) {
+          console.error("Error cargando serviceType:", rel.serviceTypeId, e);
+          return { ...rel, service: null };
+        }
+      })
+    );
+
+    reservationServices.value = enriched;
+  } catch (err) {
+    console.error("Error cargando ReservationServices:", err);
   }
+}
+
 
   return {
     // Estado

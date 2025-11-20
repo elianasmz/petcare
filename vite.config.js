@@ -10,7 +10,8 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api/, ''),
+        rewrite: (path) => path.replace(/^\/api\//, '/'), // <-- FIX IMPORTANTE
+        //rewrite: (path) => path.replace(/^\/api/, ''),
         ws: true, // Habilitar WebSocket si es necesario
         configure: (proxy, _options) => {
           proxy.on('error', (err, _req, _res) => {

@@ -184,7 +184,7 @@ function getServicesForReservation(reservationId) {
             {{ res.owner?.user?.lastName || res.owner?.lastName || '' }}
             <p>
               <strong>Servicios:</strong>
-              {{ getServicesForReservation(res.id).map(s => s?.name || 'Servicio').join(", ") || 'Cargando...' }}
+              {{ getServicesForReservation(res.id).map(s => s?.description || 'Servicio').join(", ") || 'Cargando...' }}
             </p>
             <p><strong>Fecha:</strong> {{ new Date(res.serviceDate).toLocaleString('es-PY') }}</p>
             <p><strong>Total:</strong> Gs. {{ totalPrice(getServicesForReservation(res.id)).toLocaleString('es-PY') }}</p>

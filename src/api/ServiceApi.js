@@ -26,7 +26,7 @@ class ServiceApi {
     }
 
     getServiceTypeById(id) {
-        return this.serviceApi.get(`/service-types/${id}`)
+        return this.serviceApi.get(`/services/${id}`)
     }
 
     createServiceType(data) {
